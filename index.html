@@ -56,7 +56,8 @@ aside .chk{display:flex;gap:8px;align-items:center}
 .tag.n{background:var(--accent);border-color:var(--accent);color:var(--accink)}
 .fav{position:absolute;top:18px;right:18px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(20,15,50,.58);color:#fff;font-size:17px;line-height:1;cursor:pointer}
 .fav[aria-pressed=true]{background:var(--fan)}
-.card.seen .thumb{opacity:.5}
+.card.seen .thumb img{opacity:.78}
+.card.seen .thumb::after{content:"";position:absolute;top:0;left:10px;width:22px;height:30px;background:var(--accent);clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%)}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 16px}
 .chips:empty{display:none}
 .chips button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 16px;cursor:pointer;font-size:14px;box-shadow:var(--shadow)}
@@ -78,6 +79,12 @@ dialog::backdrop{background:rgba(10,8,30,.78)}
 .dbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 18px}
 .dbar b{flex:1 1 220px;font-weight:650;font-size:15px;line-height:1.35}
 .dbar button,.dbar a{background:#2b2754;color:#fff;border:0;border-radius:999px;padding:8px 14px;cursor:pointer;text-decoration:none;font-size:14px;white-space:nowrap}
+.subtabs:empty{display:none}
+.chtitle{margin:0 0 10px;font-size:26px;font-weight:800;letter-spacing:-.02em}
+.tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;padding:10px 16px;cursor:pointer;font-weight:600;color:var(--sub)}
+.tabs button.on{color:var(--ink);border-color:var(--accent)}
+.tabs span{margin-left:6px;opacity:.6;font-variant-numeric:tabular-nums}
 #chnav{display:grid;gap:2px}
 #chnav:empty{display:none}
 #chnav h3{margin:8px 14px 4px;font-size:12.5px;font-weight:600;color:var(--sub)}
@@ -123,6 +130,7 @@ aside{max-height:calc(100vh - 32px);overflow-y:auto}
  </aside>
  <section>
   <div id="note"></div>
+  <div id="subtabs" class="subtabs"></div>
   <div id="hero"></div>
   <div id="list"></div>
   <button id="more" class="btn" type="button" hidden>공식 영상 더 불러오기</button>
@@ -158,11 +166,11 @@ const HOSTS = {
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const CATS = [["all","전체"],["fav","즐겨찾기"],["mv","뮤직비디오·티저"],["stage","무대·퍼포먼스"],["series","예능·시리즈"],["behind","비하인드·브이로그"],["etc","기타 공식 영상"],["fan","팬 쇼츠"]];
+const CATS = [["all","전체"],["fav","즐겨찾기"],["seen","책갈피(본 영상)"],["mv","뮤직비디오·티저"],["stage","무대·퍼포먼스"],["series","예능·시리즈"],["behind","비하인드·브이로그"],["etc","기타 공식 영상"],["fan","팬 쇼츠"]];
 const jget = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
 const jput = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const S = { videos:new Map(), official:{}, cat:"all", fmt:"all", scope:"all", fan:false, sort:"new", q:"", chan:"", flat:[], cur:0,
-  favs:jget("sha_fav", {}), seen:jget("sha_seen", {}), host:localStorage.getItem("sha_host") || "yo" };
+  favs:jget("sha_fav", {}), seen:jget("sha_seen", {}), hist:jget("sha_hist", {}), host:localStorage.getItem("sha_host") || "yo" };
 
 const key = () => CONFIG.apiKey || localStorage.getItem("sha_key") || "";
 const cget = (k, min) => { try { const c = JSON.parse(localStorage.getItem(k)); return c && Date.now() - c.t < min * 6e4 ? c.d : null; } catch { return null; } };
@@ -277,7 +285,15 @@ async function load() {
   render();
 }
 
+function markSeen(id) {
+  const v = S.videos.get(id); S.seen[id] = Date.now();
+  if (v) { const { extra, ...c } = v; S.hist[id] = c; }
+  const ids = Object.keys(S.hist);
+  if (ids.length > 300) ids.sort((a, b) => (S.seen[a] || 0) - (S.seen[b] || 0)).slice(0, ids.length - 300).forEach(k => delete S.hist[k]);
+  jput("sha_seen", S.seen); jput("sha_hist", S.hist);
+}
 function mergeFavs() {
+  Object.values(S.hist).forEach(v => { if (!S.videos.has(v.id)) S.videos.set(v.id, { ...v, extra:true }); });
   Object.values(S.favs).forEach(v => { if (!S.videos.has(v.id)) S.videos.set(v.id, { ...v, extra:true }); });
 }
 function toggleFav(id) {
@@ -288,7 +304,7 @@ function toggleFav(id) {
 
 function card(v) {
   const seen = !!S.seen[v.id], fav = !!S.favs[v.id];
-  const tags = `<span class="tag ${v.src === "fan" ? "f" : "o"}">${v.src === "fan" ? "팬 쇼츠" : "공식"}</span>` + (v.src === "official" && v.named ? `<span class="tag n">하영</span>` : "") + (seen ? `<span class="tag">시청함</span>` : "");
+  const tags = `<span class="tag ${v.src === "fan" ? "f" : "o"}">${v.src === "fan" ? "팬 쇼츠" : "공식"}</span>` + (v.src === "official" && v.named ? `<span class="tag n">하영</span>` : "");
   return `<article class="card${seen ? " seen" : ""}"><button class="open" data-id="${v.id}"><span class="thumb"><img loading="lazy" alt="" src="https://i.ytimg.com/vi/${v.id}/mqdefault.jpg"><span class="dur">${fmtDur(v.sec)}</span></span>
   <h3>${esc(v.t)}</h3><span class="info">${tags}<span>${esc(v.ch)}</span><span>${fmtDate(v.pub)}</span><span>조회수 ${fmtViews(v.views)}</span></span></button>
   <button class="fav" data-fav="${v.id}" aria-pressed="${fav}" aria-label="즐겨찾기">${fav ? "♥" : "♡"}</button></article>`;
@@ -296,8 +312,9 @@ function card(v) {
 
 function render() {
   const all = [...S.videos.values()];
-  const inCat = (v, c) => c === "fav" ? !!S.favs[v.id] : v.extra ? false : c === "all" ? (v.src === "official" || S.fan) : v.cat === c;
-  const pre = all.filter(v => (S.fmt === "all" || (S.fmt === "short") === (v.sec <= 60)) && (S.scope === "all" || v.named || S.cat === "fav") && (!S.q || (v.t + " " + v.ch).toLowerCase().includes(S.q)));
+  const inCat = (v, c) => c === "fav" ? !!S.favs[v.id] : c === "seen" ? !!S.seen[v.id] : v.extra ? false : c === "all" ? (v.src === "official" || S.fan) : v.cat === c;
+  const pre0 = all.filter(v => (S.scope === "all" || v.named || S.cat === "fav" || S.cat === "seen") && (!S.q || (v.t + " " + v.ch).toLowerCase().includes(S.q)));
+  const pre = pre0.filter(v => S.fmt === "all" || (S.fmt === "short") === (v.sec <= 60));
   const base = S.chan ? pre.filter(v => v.cid === S.chan) : pre;
   $("#cats").innerHTML = CATS.map(([k, l]) => `<button data-c="${k}" class="${S.cat === k ? "on" : ""}">${l}<span>${base.filter(v => inCat(v, k)).length}</span></button>`).join("");
 
@@ -306,23 +323,27 @@ function render() {
   pre.filter(v => inCat(v, S.cat)).forEach(v => { const c = cnt.get(v.cid) || { id:v.cid, n:v.ch, o:0, k:0 }; c.k++; cnt.set(v.cid, c); });
   const cb = c => `<button data-ch="${c.id}" class="${S.chan === c.id ? "on" : ""}">${esc(c.n)}<span>${c.k}</span></button>`;
   const offc = [...cnt.values()].filter(c => c.o).sort((x, y) => y.k - x.k), fanc = [...cnt.values()].filter(c => !c.o).sort((x, y) => y.k - x.k).slice(0, 15);
+  const chName = (cnt.get(S.chan) || {}).n || "";
+  const inChan = S.chan ? pre0.filter(v => inCat(v, S.cat) && v.cid === S.chan) : [];
+  $("#subtabs").innerHTML = S.chan ? `<h2 class="chtitle">${esc(chName)}</h2><div class="tabs">` + [["all","전체",inChan.length],["long","영상",inChan.filter(v => v.sec > 60).length],["short","쇼츠",inChan.filter(v => v.sec <= 60).length]].map(([k, l, n]) => `<button data-fmt="${k}" class="${S.fmt === k ? "on" : ""}">${l}<span>${n}</span></button>`).join("") + `</div>` : "";
   $("#chnav").innerHTML = (offc.length ? `<h3>공식 채널</h3><button data-ch="" class="${S.chan ? "" : "on"}">전체 채널</button>` + offc.map(cb).join("") : "") + (fanc.length ? `<h3>팬 채널(쇼츠)</h3>` + fanc.map(cb).join("") : "");
 
   const a = base.filter(v => inCat(v, S.cat));
   a.sort({ new:(x,y)=>y.pub.localeCompare(x.pub), old:(x,y)=>x.pub.localeCompare(y.pub), views:(x,y)=>y.views-x.views }[S.sort]);
   const groups = [];
   if (S.cat === "fav") groups.push(["즐겨찾기", a]);
+  else if (S.cat === "seen") { a.sort((x, y) => S.seen[y.id] - S.seen[x.id]); groups.push(["최근에 본 순", a]); }
   else {
-    const fresh = a.filter(v => !S.seen[v.id]), seen = a.filter(v => S.seen[v.id]);
+    const fresh = a;
     const off = fresh.filter(v => v.src === "official"), fan = fresh.filter(v => v.src === "fan");
     if (S.sort === "views") groups.push(["공식 영상", off]);
     else { const m = new Map(); off.forEach(v => { const y = v.pub.slice(0,4) + "년"; if (!m.has(y)) m.set(y, []); m.get(y).push(v); }); m.forEach((l, y) => groups.push([y, l])); }
-    groups.push(["팬 쇼츠", fan], ["이미 본 영상", seen]);
+    groups.push(["팬 쇼츠", fan]);
   }
   const shown = groups.filter(g => g[1].length);
   S.flat = shown.flatMap(g => g[1]);
   $("#list").innerHTML = shown.map(([h, l]) => `<h2 class="gh">${h}<small>${l.length}개</small></h2><div class="grid">${l.map(card).join("")}</div>`).join("")
-    || `<p class="empty">${S.cat === "fav" ? "즐겨찾기한 영상이 없어요. 카드의 ♡를 눌러 추가해 보세요." : "조건에 맞는 영상이 없어요. 필터를 바꿔 보세요."}</p>`;
+    || `<p class="empty">${S.cat === "fav" ? "즐겨찾기한 영상이 없어요. 카드의 ♡를 눌러 추가해 보세요." : S.cat === "seen" ? "아직 본 영상이 없어요." : "조건에 맞는 영상이 없어요. 필터를 바꿔 보세요."}</p>`;
 
   const latest = all.filter(v => v.src === "official" && !v.extra && !S.seen[v.id]).sort((x, y) => y.pub.localeCompare(x.pub))[0];
   $("#hero").innerHTML = latest && S.cat === "all" && !S.q && !S.chan ? `<button class="open hero" data-id="${latest.id}"><span class="thumb"><img alt="" src="https://i.ytimg.com/vi/${latest.id}/hqdefault.jpg"><span class="dur">${fmtDur(latest.sec)}</span></span><span><span class="tag o">아직 안 본 최신 공식 영상</span><h2>${esc(latest.t)}</h2><p>${esc(latest.ch)}, ${fmtDate(latest.pub)}</p></span></button>` : "";
@@ -342,7 +363,7 @@ function syncFav() {
 function play() {
   const v = S.flat[S.cur]; if (!v) return;
   const h = HOSTS[S.host] || HOSTS.yt;
-  S.seen[v.id] = Date.now(); jput("sha_seen", S.seen);
+  markSeen(v.id);
   $("#dt").textContent = v.t;
   const l = $("#yt"); l.href = h.watch + v.id; l.textContent = h.name + "에서 보기";
   syncFav();
@@ -354,7 +375,7 @@ function play() {
 function openVideo(id) {
   const v = S.videos.get(id); if (!v) return;
   if (S.host === "yo") {
-    S.seen[id] = Date.now(); jput("sha_seen", S.seen);
+    markSeen(id);
     document.querySelector(`[data-id="${id}"]`)?.closest(".card")?.classList.add("seen");
     window.open(HOSTS.yo.watch + id, "_blank", "noopener");
     return;
@@ -367,6 +388,7 @@ const step = d => { const n = S.cur + d; if (n >= 0 && n < S.flat.length) { S.cu
 
 document.addEventListener("click", e => {
   const f = e.target.closest("[data-fav]"); if (f) { toggleFav(f.dataset.fav); render(); return; }
+  const m = e.target.closest("[data-fmt]"); if (m) { S.fmt = m.dataset.fmt; $("#fmt").value = S.fmt; render(); return; }
   const c = e.target.closest("[data-c]"); if (c) { S.cat = c.dataset.c; S.chan = ""; render(); return; }
   const h = e.target.closest("[data-ch]"); if (h) { S.chan = h.dataset.ch; render(); return; }
   const v = e.target.closest("[data-id]"); if (v) openVideo(v.dataset.id);
@@ -384,7 +406,7 @@ $("#fan").onchange = e => { S.fan = e.target.checked; render(); };
 $("#q").oninput = e => { S.q = e.target.value.trim().toLowerCase(); render(); };
 $("#host").value = S.host;
 $("#host").onchange = e => { S.host = e.target.value; localStorage.setItem("sha_host", S.host); };
-$("#clearseen").onclick = () => { S.seen = {}; jput("sha_seen", S.seen); render(); };
+$("#clearseen").onclick = () => { S.seen = {}; S.hist = {}; jput("sha_seen", S.seen); jput("sha_hist", S.hist); render(); };
 const parseChan = s => { let m; if (m = /(UC[\w-]{20,})/.exec(s)) return { id:m[1] }; if (m = /@([\w.\-]+)/.exec(s)) return { handle:"@" + m[1] }; return { search:s }; };
 $("#chin").value = jget("sha_chans", []).map(c => c.id || c.handle || c.search).join(", ");
 $("#chset").onclick = () => {
