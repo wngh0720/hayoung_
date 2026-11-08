@@ -32,7 +32,7 @@ aside{position:sticky;top:16px;align-self:start;display:grid;grid-template-colum
 #cats button.on{background:var(--on);color:var(--onink);font-weight:700}
 #cats span{opacity:.6;font-variant-numeric:tabular-nums}
 aside label{display:grid;gap:5px;font-size:13px;color:var(--sub)}
-aside select,aside input[type=search]{width:100%;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)}
+aside select,aside input[type=search],aside input[type=text]{width:100%;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)}
 aside .chk{display:flex;gap:8px;align-items:center}
 .hero{display:grid;grid-template-columns:1.4fr 1fr;gap:26px;align-items:center;background:var(--surface);border-radius:26px;padding:16px;margin-bottom:6px;box-shadow:var(--shadow);border:1px solid var(--line)}
 .hero h2{margin:10px 0 8px;font-size:clamp(20px,2.4vw,30px);line-height:1.3;letter-spacing:-.02em;color:var(--ink)}
@@ -104,8 +104,10 @@ dialog::backdrop{background:rgba(10,8,30,.78)}
   <label>범위<select id="scope"><option value="all">공식 채널 전체 영상</option><option value="named">제목·설명에 하영이 들어간 영상</option></select></label>
   <label>정렬<select id="sort"><option value="new">최신순</option><option value="old">오래된순</option><option value="views">조회수순</option></select></label>
   <label class="chk"><input id="fan" type="checkbox">전체 목록 끝에 팬 쇼츠도 보기</label>
-  <label>재생 주소<select id="host"><option value="yt">유튜브</option><option value="yo">yout-ube</option></select></label>
+  <label>영상 열기 방식<select id="host"><option value="yo">yout-ube 링크로 열기</option><option value="yt">사이트 안에서 재생(유튜브)</option></select></label>
   <button id="clearseen" class="btn" type="button">시청 기록 지우기</button>
+  <label>공식 채널 바꾸기<input id="chin" type="text" placeholder="채널 주소나 @아이디 (여러 개는 쉼표로)"></label>
+  <button id="chset" class="btn" type="button">채널 적용</button>
  </aside>
  <section>
   <div id="note"></div>
@@ -147,7 +149,7 @@ const CATS = [["all","전체"],["fav","즐겨찾기"],["mv","뮤직비디오·�
 const jget = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
 const jput = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const S = { videos:new Map(), official:{}, cat:"all", fmt:"all", scope:"all", fan:false, sort:"new", q:"", chan:"", flat:[], cur:0,
-  favs:jget("sha_fav", {}), seen:jget("sha_seen", {}), host:localStorage.getItem("sha_host") || "yt" };
+  favs:jget("sha_fav", {}), seen:jget("sha_seen", {}), host:localStorage.getItem("sha_host") || "yo" };
 
 const key = () => CONFIG.apiKey || localStorage.getItem("sha_key") || "";
 const cget = (k, min) => { try { const c = JSON.parse(localStorage.getItem(k)); return c && Date.now() - c.t < min * 6e4 ? c.d : null; } catch { return null; } };
@@ -191,18 +193,22 @@ async function hydrate(ids, src) {
 }
 
 async function resolve(c) {
-  const ck = c.id || c.handle, cache = JSON.parse(localStorage.getItem("sha_ch") || "{}");
+  const ck = c.id || c.handle || c.search, cache = jget("sha_ch2", {});
   if (cache[ck]) return cache[ck];
-  let it;
-  if (c.id) it = (await yt("channels", { part:"snippet,contentDetails", id:c.id })).items?.[0];
-  else if (c.handle) it = (await yt("channels", { part:"snippet,contentDetails", forHandle:c.handle })).items?.[0];
-  if (!it && c.search) {
-    const s = (await yt("search", { part:"snippet", type:"channel", q:c.search, maxResults:1 })).items?.[0];
-    if (s) it = (await yt("channels", { part:"snippet,contentDetails", id:s.snippet.channelId })).items?.[0];
+  const P = "snippet,contentDetails,statistics", found = [];
+  const add = items => (items || []).forEach(it => { if (!found.some(f => f.id === it.id)) found.push(it); });
+  const usable = () => found.filter(f => +f.statistics?.videoCount > 0);
+  if (c.id) add((await yt("channels", { part:P, id:c.id })).items);
+  else if (c.handle) add((await yt("channels", { part:P, forHandle:c.handle })).items);
+  if (!usable().length && c.search) {
+    const s = await yt("search", { part:"snippet", type:"channel", q:c.search, maxResults:5 });
+    const ids = s.items.map(i => i.snippet.channelId).join(",");
+    if (ids) add((await yt("channels", { part:P, id:ids })).items);
   }
-  if (!it) throw new Error("공식 채널을 찾지 못했어요: " + ck);
+  const it = usable().sort((x, y) => (/fromis/i.test(y.snippet.title) - /fromis/i.test(x.snippet.title)) || ((+y.statistics.subscriberCount || 0) - (+x.statistics.subscriberCount || 0)))[0];
+  if (!it) throw Object.assign(new Error("공식 채널을 찾지 못했어요: " + ck), { reason:"playlistNotFound" });
   const r = { id:it.id, title:it.snippet.title, up:it.contentDetails.relatedPlaylists.uploads };
-  cache[ck] = r; localStorage.setItem("sha_ch", JSON.stringify(cache));
+  cache[ck] = r; jput("sha_ch2", cache);
   return r;
 }
 
@@ -231,7 +237,7 @@ async function load() {
   S.videos.clear(); S.official = {};
   const off = cget("sha_off2", CONFIG.cacheMin);
   if (off) { off.videos.forEach(v => S.videos.set(v.id, v)); S.official = off.state; }
-  else { for (const c of CONFIG.official) await loadUploads(await resolve(c), CONFIG.pages); saveOff(); }
+  else { for (const c of jget("sha_chans", CONFIG.official)) await loadUploads(await resolve(c), CONFIG.pages); saveOff(); }
   let fanNote = "";
   const fan = cget("sha_fan2", CONFIG.fanCacheMin);
   if (fan) fan.forEach(v => S.videos.set(v.id, v));
@@ -293,7 +299,8 @@ function render() {
   $("#hero").innerHTML = latest && S.cat === "all" && !S.q && !S.chan ? `<button class="open hero" data-id="${latest.id}"><span class="thumb"><img alt="" src="https://i.ytimg.com/vi/${latest.id}/hqdefault.jpg"><span class="dur">${fmtDur(latest.sec)}</span></span><span><span class="tag o">아직 안 본 최신 공식 영상</span><h2>${esc(latest.t)}</h2><p>${esc(latest.ch)}, ${fmtDate(latest.pub)}</p></span></button>` : "";
 
   const nOff = all.filter(v => v.src === "official" && !v.extra).length, nFan = all.filter(v => v.src === "fan" && !v.extra).length;
-  $("#meta").textContent = `공식 ${nOff}개, 팬 쇼츠 ${nFan}개, 즐겨찾기 ${Object.keys(S.favs).length}개`;
+  const ct = Object.values(S.official).map(s => s.title).join(", ");
+  $("#meta").textContent = `공식 ${nOff}개${ct ? " (" + ct + ")" : ""}, 팬 쇼츠 ${nFan}개, 즐겨찾기 ${Object.keys(S.favs).length}개`;
   $("#more").hidden = !Object.values(S.official).some(s => s.next !== null);
 }
 
@@ -316,6 +323,12 @@ function play() {
 }
 function openVideo(id) {
   const v = S.videos.get(id); if (!v) return;
+  if (S.host === "yo") {
+    S.seen[id] = Date.now(); jput("sha_seen", S.seen);
+    document.querySelector(`[data-id="${id}"]`)?.closest(".card")?.classList.add("seen");
+    window.open(HOSTS.yo.watch + id, "_blank", "noopener");
+    return;
+  }
   S.cur = S.flat.findIndex(x => x.id === id);
   if (S.cur < 0) { S.flat = [v]; S.cur = 0; }
   play(); $("#dlg").showModal();
@@ -342,6 +355,13 @@ $("#q").oninput = e => { S.q = e.target.value.trim().toLowerCase(); render(); };
 $("#host").value = S.host;
 $("#host").onchange = e => { S.host = e.target.value; localStorage.setItem("sha_host", S.host); };
 $("#clearseen").onclick = () => { S.seen = {}; jput("sha_seen", S.seen); render(); };
+const parseChan = s => { let m; if (m = /(UC[\w-]{20,})/.exec(s)) return { id:m[1] }; if (m = /@([\w.\-]+)/.exec(s)) return { handle:"@" + m[1] }; return { search:s }; };
+$("#chin").value = jget("sha_chans", []).map(c => c.id || c.handle || c.search).join(", ");
+$("#chset").onclick = () => {
+  const v = $("#chin").value.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+  if (v.length) localStorage.setItem("sha_chans", JSON.stringify(v.map(parseChan))); else localStorage.removeItem("sha_chans");
+  localStorage.removeItem("sha_off2"); localStorage.removeItem("sha_ch2"); start();
+};
 $("#refresh").onclick = () => { localStorage.removeItem("sha_off2"); start(); };
 $("#more").onclick = async () => {
   const b = $("#more"); b.disabled = true; b.textContent = "불러오는 중…";
@@ -361,7 +381,9 @@ function showSetup() {
   $("#ks").onclick = () => { const k = $("#k").value.trim(); if (k) { localStorage.setItem("sha_key", k); start(); } };
 }
 function showErr(e) {
-  const m = e.reason === "quotaExceeded" ? "오늘 API 할당량을 모두 썼어요. 한국 시간 오후 4~5시쯤 초기화돼요."
+  if (e.reason === "playlistNotFound") { localStorage.removeItem("sha_ch2"); localStorage.removeItem("sha_off2"); }
+  const m = e.reason === "playlistNotFound" ? "공식 채널의 영상 목록을 찾지 못했어요. 왼쪽 '공식 채널 바꾸기'에 올바른 채널 주소를 넣어 주세요."
+    : e.reason === "quotaExceeded" ? "오늘 API 할당량을 모두 썼어요. 한국 시간 오후 4~5시쯤 초기화돼요."
     : /key|referer|API/i.test(e.message) ? "API 키 또는 리퍼러 제한을 확인해 주세요. (" + e.message + ")" : e.message;
   $("#note").innerHTML = `<div class="box err">${esc(m)} <button class="btn" id="rk" type="button">키 다시 입력</button></div>`;
   $("#rk").onclick = () => { localStorage.removeItem("sha_key"); showSetup(); };
