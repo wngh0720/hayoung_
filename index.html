@@ -133,7 +133,7 @@ const CONFIG = {
   ],
   fanQueries: ["송하영 쇼츠", "송하영 직캠 shorts", "Song Hayoung shorts"],  // 팬 쇼츠 검색어 (비우면 팬 쇼츠 끔)
   fanMaxSec: 180,                   // 팬 영상은 이 길이 이하(쇼츠)만 사용
-  pages: 4,                         // 처음에 불러올 업로드 페이지 수 (1페이지 = 50개)
+  pages: 1,                         // 처음에 불러올 업로드 페이지 수 (1페이지 = 50개)
   cacheMin: 30, fanCacheMin: 360    // 캐시 시간(분). 길수록 API 할당량을 아껴요
 };
 /* ==================================== */
@@ -238,6 +238,7 @@ async function load() {
   const off = cget("sha_off2", CONFIG.cacheMin);
   if (off) { off.videos.forEach(v => S.videos.set(v.id, v)); S.official = off.state; }
   else { for (const c of jget("sha_chans", CONFIG.official)) await loadUploads(await resolve(c), CONFIG.pages); saveOff(); }
+  mergeFavs(); render();
   let fanNote = "";
   const fan = cget("sha_fan2", CONFIG.fanCacheMin);
   if (fan) fan.forEach(v => S.videos.set(v.id, v));
@@ -302,6 +303,7 @@ function render() {
   const ct = Object.values(S.official).map(s => s.title).join(", ");
   $("#meta").textContent = `공식 ${nOff}개${ct ? " (" + ct + ")" : ""}, 팬 쇼츠 ${nFan}개, 즐겨찾기 ${Object.keys(S.favs).length}개`;
   $("#more").hidden = !Object.values(S.official).some(s => s.next !== null);
+  setTimeout(checkMore, 0);
 }
 
 /* 재생 창 */
@@ -363,11 +365,17 @@ $("#chset").onclick = () => {
   localStorage.removeItem("sha_off2"); localStorage.removeItem("sha_ch2"); start();
 };
 $("#refresh").onclick = () => { localStorage.removeItem("sha_off2"); start(); };
-$("#more").onclick = async () => {
-  const b = $("#more"); b.disabled = true; b.textContent = "불러오는 중…";
-  try { for (const st of Object.values(S.official)) await loadUploads(st, 2); saveOff(); render(); } catch (e) { showErr(e); }
-  b.disabled = false; b.textContent = "공식 영상 더 불러오기";
-};
+let busy = false, autoOff = false;
+async function loadMore() {
+  const b = $("#more"); if (busy || b.hidden) return;
+  busy = true; b.disabled = true; b.textContent = "불러오는 중…";
+  try { for (const st of Object.values(S.official)) await loadUploads(st, 1); saveOff(); render(); }
+  catch (e) { autoOff = true; showErr(e); }
+  busy = false; b.disabled = false; b.textContent = "공식 영상 더 불러오기";
+}
+const checkMore = () => { const b = $("#more"); if (!busy && !autoOff && !b.hidden && b.getBoundingClientRect().top < innerHeight + 400) loadMore(); };
+$("#more").onclick = () => { autoOff = false; loadMore(); };
+addEventListener("scroll", checkMore, { passive: true });
 
 /* 안내와 오류 */
 function showSetup() {
@@ -390,6 +398,7 @@ function showErr(e) {
   $("#meta").textContent = "불러오지 못했어요";
 }
 async function start() {
+  autoOff = false;
   if (!key()) { showSetup(); return; }
   $("#note").innerHTML = "";
   try { await load(); } catch (e) { showErr(e); }
