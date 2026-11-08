@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>송하영 영상 아카이브</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{--bg:#f7f4ff;--surface:#fff;--ink:#272342;--sub:#7a7596;--line:#e6e0f7;--accent:#7c5cf0;--accent2:#ff8fb8;--accink:#fff;--fan:#d9407a;--on:#3b2e86;--onink:#fff;--headink:#2a1f5c;--shadow:0 6px 22px rgba(110,80,200,.13);--head:linear-gradient(120deg,#b9a6ff 0%,#e3a9ff 48%,#ffb3cf 100%)}
+:root[data-theme=mint]{--bg:#f0fbf8;--ink:#173a35;--sub:#5b857e;--line:#d2eee7;--accent:#0e8b75;--accent2:#6fd8bd;--fan:#d9407a;--on:#0f5f51;--headink:#0f3d36;--shadow:0 6px 22px rgba(20,140,120,.14);--head:linear-gradient(120deg,#8fe3cf 0%,#a9e8ff 55%,#cdf3a8 100%)}
+:root[data-theme=night]{color-scheme:dark;--bg:#14122a;--surface:#1f1c3b;--ink:#efecff;--sub:#a6a1d0;--line:#34305f;--accent:#a58bff;--accent2:#ff8fb8;--accink:#1b1640;--fan:#ff7aa0;--on:#a58bff;--onink:#1b1640;--headink:#fff;--shadow:0 6px 22px rgba(0,0,0,.4);--head:linear-gradient(120deg,#2b2060 0%,#4a2a7a 55%,#7a2f7f 100%)}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Pretendard Variable",Pretendard,system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.top{padding:44px 24px 40px;color:var(--headink);border-radius:0 0 36px 36px;background:radial-gradient(circle at 88% 15%,rgba(255,255,255,.55),transparent 36%),radial-gradient(circle at 8% 120%,rgba(255,255,255,.35),transparent 42%),var(--head)}
+.top>div{max-width:1280px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:16px}
+h1{margin:0;font-size:clamp(30px,5.5vw,54px);font-weight:800;letter-spacing:-.035em;line-height:1.1}
+#meta{margin:10px 0 0;font-size:14.5px;opacity:.8}
+.tools{display:flex;gap:14px;align-items:center}
+#themes{display:flex;gap:8px}
+#themes button{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.7);cursor:pointer;padding:0}
+#themes button[aria-pressed=true]{border-color:#fff;box-shadow:0 0 0 3px var(--headink)}
+#themes [data-t=lilac]{background:linear-gradient(135deg,#a98bff,#ff9cc4)}
+#themes [data-t=mint]{background:linear-gradient(135deg,#34c7a8,#a5e86f)}
+#themes [data-t=night]{background:linear-gradient(135deg,#1b1640,#7a3fb0)}
+#refresh{background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.75);color:var(--headink);border-radius:999px;padding:8px 18px;cursor:pointer;font-weight:600}
+.wrap{max-width:1280px;margin:0 auto;padding:32px 24px 90px;display:grid;grid-template-columns:240px 1fr;gap:34px}
+aside{position:sticky;top:16px;align-self:start;display:grid;gap:16px;background:var(--surface);border-radius:22px;padding:16px;box-shadow:var(--shadow)}
+#cats button{display:flex;justify-content:space-between;gap:8px;width:100%;padding:10px 14px;border:0;border-radius:12px;background:transparent;text-align:left;cursor:pointer;font-weight:500}
+#cats button:hover{background:var(--bg)}
+#cats button.on{background:var(--on);color:var(--onink);font-weight:700}
+#cats span{opacity:.6;font-variant-numeric:tabular-nums}
+aside label{display:grid;gap:5px;font-size:13px;color:var(--sub)}
+aside select,aside input[type=search]{padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)}
+aside .chk{display:flex;gap:8px;align-items:center}
+.hero{display:grid;grid-template-columns:1.4fr 1fr;gap:26px;align-items:center;background:var(--surface);border-radius:26px;padding:16px;margin-bottom:6px;box-shadow:var(--shadow);border:1px solid var(--line)}
+.hero h2{margin:10px 0 8px;font-size:clamp(20px,2.4vw,30px);line-height:1.3;letter-spacing:-.02em;color:var(--ink)}
+.hero p{margin:0;color:var(--sub);font-size:14px}
+.gh{display:flex;align-items:center;gap:12px;margin:38px 0 18px;font-size:23px;font-weight:800;letter-spacing:-.02em}
+.gh::before{content:"";width:6px;height:24px;border-radius:3px;background:linear-gradient(var(--accent),var(--accent2))}
+.gh small{font-size:13px;font-weight:500;color:var(--sub)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:22px 20px}
+.card{position:relative;background:var(--surface);border-radius:20px;padding:10px 10px 14px;box-shadow:var(--shadow)}
+.open{border:0;background:none;padding:0;text-align:left;cursor:pointer;display:block;width:100%;color:inherit}
+.hero.open{display:grid}
+.thumb{position:relative;display:block;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.dur{position:absolute;right:8px;bottom:8px;background:rgba(15,10,40,.78);color:#fff;font-size:12px;padding:1px 7px;border-radius:999px}
+.card h3{margin:10px 4px 6px;font-size:15px;line-height:1.4;font-weight:650;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card:hover h3{color:var(--accent)}
+.info{margin:0 4px;font-size:12.5px;color:var(--sub);display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.tag{font-size:11.5px;font-weight:650;padding:0 8px;border-radius:999px;border:1px solid}
+.tag.o{color:var(--accent);border-color:var(--accent)}
+.tag.f{color:var(--fan);border-color:var(--fan)}
+.tag.n{background:var(--accent);border-color:var(--accent);color:var(--accink)}
+.fav{position:absolute;top:18px;right:18px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(20,15,50,.58);color:#fff;font-size:17px;line-height:1;cursor:pointer}
+.fav[aria-pressed=true]{background:var(--fan)}
+.card.seen .thumb{opacity:.5}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 16px}
+.chips:empty{display:none}
+.chips button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 16px;cursor:pointer;font-size:14px;box-shadow:var(--shadow)}
+.chips button.on{background:var(--on);color:var(--onink);border-color:var(--on)}
+.chips small{opacity:.6;margin-left:6px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 22px;margin-bottom:20px;font-size:14.5px;box-shadow:var(--shadow)}
+.box.err{border-color:var(--fan)}
+.box ol{padding-left:20px;margin:8px 0}
+.box input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin:6px 0;background:var(--bg)}
+.btn{background:linear-gradient(120deg,var(--accent),var(--accent2));color:var(--accink);border:0;border-radius:999px;padding:9px 18px;cursor:pointer;font-weight:650}
+#more{display:block;margin:40px auto 0}
+.empty{color:var(--sub);padding:40px 0}
+dialog{width:min(980px,94vw);border:0;border-radius:22px;padding:0;background:#12102a;color:#fff;overflow:hidden}
+dialog::backdrop{background:rgba(10,8,30,.78)}
+.player{aspect-ratio:16/9;width:100%;background:#000;display:grid;place-items:center}
+.player.v{aspect-ratio:9/16;max-height:76vh;width:auto;margin:0 auto}
+.player iframe{width:100%;height:100%;border:0}
+.dbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 18px}
+.dbar b{flex:1 1 220px;font-weight:650;font-size:15px;line-height:1.35}
+.dbar button,.dbar a{background:#2b2754;color:#fff;border:0;border-radius:999px;padding:8px 14px;cursor:pointer;text-decoration:none;font-size:14px;white-space:nowrap}
+@media(prefers-reduced-motion:no-preference){.card{transition:transform .18s,box-shadow .18s}.card:hover{transform:translateY(-4px)}}
+@media(max-width:860px){
+ .wrap{grid-template-columns:1fr;gap:20px;padding:20px 16px 60px}
+ aside{position:static}
+ #cats{display:flex;overflow-x:auto;gap:4px}
+ #cats button{width:auto;white-space:nowrap}
+ .hero{grid-template-columns:1fr}
+ .grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+ .top{border-radius:0 0 26px 26px}
+}
+</style>
+</head>
+<body>
+<header class="top"><div>
+ <section><h1>송하영 영상 아카이브</h1><p id="meta">공식 채널 영상을 먼저, 팬 쇼츠는 따로 모아 봐요</p></section>
+ <div class="tools"><span id="themes" role="group" aria-label="테마"><button type="button" data-t="lilac" aria-label="라일락 테마"></button><button type="button" data-t="mint" aria-label="민트 테마"></button><button type="button" data-t="night" aria-label="밤하늘 테마"></button></span><button id="refresh" type="button">새로고침</button></div>
+</div></header>
+
+<main class="wrap">
+ <aside>
+  <nav id="cats" aria-label="영상 분류"></nav>
+  <label>검색<input id="q" type="search" placeholder="제목이나 채널 이름"></label>
+  <label>형식<select id="fmt"><option value="all">전체</option><option value="long">일반 영상</option><option value="short">쇼츠(60초 이하)</option></select></label>
+  <label>범위<select id="scope"><option value="all">공식 채널 전체 영상</option><option value="named">제목·설명에 하영이 들어간 영상</option></select></label>
+  <label>정렬<select id="sort"><option value="new">최신순</option><option value="old">오래된순</option><option value="views">조회수순</option></select></label>
+  <label class="chk"><input id="fan" type="checkbox">전체 목록 끝에 팬 쇼츠도 보기</label>
+  <label>재생 주소<select id="host"><option value="yt">유튜브</option><option value="yo">yout-ube</option></select></label>
+  <button id="clearseen" class="btn" type="button">시청 기록 지우기</button>
+ </aside>
+ <section>
+  <div id="note"></div>
+  <div id="chips" class="chips"></div>
+  <div id="hero"></div>
+  <div id="list"></div>
+  <button id="more" class="btn" type="button" hidden>공식 영상 더 불러오기</button>
+ </section>
+</main>
+
+<dialog id="dlg">
+ <div class="player" id="player"></div>
+ <div class="dbar"><b id="dt"></b><button id="favd" type="button"></button><button id="prev" type="button">이전</button><button id="next" type="button">다음</button><a id="yt" target="_blank" rel="noopener">유튜브에서 보기</a><button id="close" type="button">닫기</button></div>
+</dialog>
+
+<script>
+/* ===== 설정: 여기만 고치면 돼요 ===== */
+const CONFIG = {
+  apiKey: "",                       // 발급받은 YouTube Data API 키를 넣거나, 비워 두고 사이트에서 직접 입력
+  names: ["송하영", "song hayoung", "hayoung", "하영"],       // 공식 영상에서 '하영 포함'으로 표시할 단어
+  official: [                       // 공식 채널 목록 (handle, id 중 하나. 못 찾으면 search 이름으로 검색)
+    { handle: "@fromis_9", search: "Official fromis_9" }
+  ],
+  fanQueries: ["송하영 쇼츠", "송하영 직캠 shorts", "Song Hayoung shorts"],  // 팬 쇼츠 검색어 (비우면 팬 쇼츠 끔)
+  fanMaxSec: 180,                   // 팬 영상은 이 길이 이하(쇼츠)만 사용
+  pages: 4,                         // 처음에 불러올 업로드 페이지 수 (1페이지 = 50개)
+  cacheMin: 30, fanCacheMin: 360    // 캐시 시간(분). 길수록 API 할당량을 아껴요
+};
+/* ==================================== */
+/* 재생 주소. yout-ube는 유튜브가 운영하는 곳이 아닌 외부 미러라서, 주소가 바뀌면 여기서 고쳐요 */
+const HOSTS = {
+  yt: { name:"유튜브", embed:"https://www.youtube-nocookie.com/embed/", watch:"https://www.youtube.com/watch?v=" },
+  yo: { name:"yout-ube", embed:"https://yout-ube.com/embed/", watch:"https://yout-ube.com/watch?v=" }
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const CATS = [["all","전체"],["fav","즐겨찾기"],["mv","뮤직비디오·티저"],["stage","무대·퍼포먼스"],["series","예능·시리즈"],["behind","비하인드·브이로그"],["etc","기타 공식 영상"],["fan","팬 쇼츠"]];
+const jget = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
+const jput = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const S = { videos:new Map(), official:{}, cat:"all", fmt:"all", scope:"all", fan:false, sort:"new", q:"", chan:"", flat:[], cur:0,
+  favs:jget("sha_fav", {}), seen:jget("sha_seen", {}), host:localStorage.getItem("sha_host") || "yt" };
+
+const key = () => CONFIG.apiKey || localStorage.getItem("sha_key") || "";
+const cget = (k, min) => { try { const c = JSON.parse(localStorage.getItem(k)); return c && Date.now() - c.t < min * 6e4 ? c.d : null; } catch { return null; } };
+const cput = (k, d) => { try { localStorage.setItem(k, JSON.stringify({ t: Date.now(), d })); } catch {} };
+
+async function yt(path, p) {
+  const u = new URL("https://www.googleapis.com/youtube/v3/" + path);
+  Object.entries({ ...p, key: key() }).forEach(([k, v]) => u.searchParams.set(k, v));
+  const r = await fetch(u), j = await r.json();
+  if (!r.ok) { const e = new Error(j.error?.message || r.status); e.reason = j.error?.errors?.[0]?.reason; throw e; }
+  return j;
+}
+const secOf = s => { const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(s) || []; return (+m[1]||0)*3600 + (+m[2]||0)*60 + (+m[3]||0); };
+const fmtDur = n => { const h = Math.floor(n/3600), m = Math.floor(n%3600/60), s = n%60; return (h ? h + ":" + String(m).padStart(2,"0") : m) + ":" + String(s).padStart(2,"0"); };
+const fmtViews = n => n >= 1e8 ? (n/1e8).toFixed(1)+"억" : n >= 1e4 ? (n/1e4).toFixed(1)+"만" : n >= 1e3 ? (n/1e3).toFixed(1)+"천" : n;
+const fmtDate = d => new Date(d).toLocaleDateString("ko-KR", { year:"numeric", month:"2-digit", day:"2-digit" });
+
+function classify(t) {
+  t = t.toLowerCase();
+  if (/behind|비하인드|vlog|브이로그|making|메이킹|jacket|촬영|photoshoot|fromis_ room/.test(t)) return "behind";
+  if (/m\/v|\bmv\b|music video|뮤직비디오|뮤비|teaser|티저|trailer|highlight/.test(t)) return "mv";
+  if (/performance|퍼포먼스|choreograph|안무|dance|live|라이브|stage|무대|직캠|fancam|inkigayo|music bank|m countdown|show champion|the show|music core/.test(t)) return "stage";
+  if (/channel_9|fm_1\.24|fromisoda|fl.ylist|running_9|예능|\bep\.?\s?\d|episode|에피소드|balance game|asmr|reaction|리액션/.test(t)) return "series";
+  return "etc";
+}
+const loose = t => CONFIG.names.some(n => t.includes(n));
+const strict = t => t.includes("송하영") || t.includes("song hayoung") || (/하영|hayoung/.test(t) && /프로미스|fromis/.test(t));
+
+async function hydrate(ids, src) {
+  const officialIds = new Set(Object.keys(S.official));
+  for (let i = 0; i < ids.length; i += 50) {
+    const j = await yt("videos", { part:"snippet,contentDetails,statistics,status", id:ids.slice(i, i+50).join(","), maxResults:50 });
+    for (const it of j.items) {
+      const prev = S.videos.get(it.id); if (prev && !prev.extra) continue;
+      const sn = it.snippet, text = (sn.title + " " + (sn.description || "")).toLowerCase(), sec = secOf(it.contentDetails.duration);
+      if (src === "fan" && (sec > CONFIG.fanMaxSec || !strict(text) || officialIds.has(sn.channelId))) continue;
+      S.videos.set(it.id, { id:it.id, t:sn.title, ch:sn.channelTitle, cid:sn.channelId, pub:sn.publishedAt, sec, views:+(it.statistics?.viewCount||0),
+        emb:it.status?.embeddable !== false, src, named: src === "fan" ? true : loose(text), cat: src === "fan" ? "fan" : classify(sn.title) });
+    }
+  }
+}
+
+async function resolve(c) {
+  const ck = c.id || c.handle, cache = JSON.parse(localStorage.getItem("sha_ch") || "{}");
+  if (cache[ck]) return cache[ck];
+  let it;
+  if (c.id) it = (await yt("channels", { part:"snippet,contentDetails", id:c.id })).items?.[0];
+  else if (c.handle) it = (await yt("channels", { part:"snippet,contentDetails", forHandle:c.handle })).items?.[0];
+  if (!it && c.search) {
+    const s = (await yt("search", { part:"snippet", type:"channel", q:c.search, maxResults:1 })).items?.[0];
+    if (s) it = (await yt("channels", { part:"snippet,contentDetails", id:s.snippet.channelId })).items?.[0];
+  }
+  if (!it) throw new Error("공식 채널을 찾지 못했어요: " + ck);
+  const r = { id:it.id, title:it.snippet.title, up:it.contentDetails.relatedPlaylists.uploads };
+  cache[ck] = r; localStorage.setItem("sha_ch", JSON.stringify(cache));
+  return r;
+}
+
+async function loadUploads(ch, pages) {
+  const st = S.official[ch.id] || (S.official[ch.id] = { ...ch, next: undefined });
+  for (let n = 0; n < pages && st.next !== null; n++) {
+    const j = await yt("playlistItems", { part:"contentDetails", playlistId:st.up, maxResults:50, ...(st.next ? { pageToken:st.next } : {}) });
+    st.next = j.nextPageToken || null;
+    await hydrate(j.items.map(i => i.contentDetails.videoId), "official");
+  }
+}
+
+async function loadFan() {
+  const ids = new Set();
+  for (const q of CONFIG.fanQueries) {
+    const j = await yt("search", { part:"snippet", type:"video", q, videoDuration:"short", order:"date", maxResults:50, relevanceLanguage:"ko" });
+    j.items.forEach(i => ids.add(i.id.videoId));
+  }
+  await hydrate([...ids], "fan");
+}
+
+const saveOff = () => cput("sha_off2", { videos:[...S.videos.values()].filter(v => v.src === "official" && !v.extra), state:S.official });
+
+async function load() {
+  $("#meta").textContent = "불러오는 중…";
+  S.videos.clear(); S.official = {};
+  const off = cget("sha_off2", CONFIG.cacheMin);
+  if (off) { off.videos.forEach(v => S.videos.set(v.id, v)); S.official = off.state; }
+  else { for (const c of CONFIG.official) await loadUploads(await resolve(c), CONFIG.pages); saveOff(); }
+  let fanNote = "";
+  const fan = cget("sha_fan2", CONFIG.fanCacheMin);
+  if (fan) fan.forEach(v => S.videos.set(v.id, v));
+  else if (CONFIG.fanQueries.length) {
+    try { await loadFan(); cput("sha_fan2", [...S.videos.values()].filter(v => v.src === "fan")); }
+    catch (e) { fanNote = "팬 쇼츠는 불러오지 못했어요(" + (e.reason === "quotaExceeded" ? "오늘 할당량 소진" : e.message) + "). 공식 영상은 정상이에요."; }
+  }
+  $("#note").innerHTML = fanNote ? `<div class="box err">${esc(fanNote)}</div>` : "";
+  mergeFavs();
+  render();
+}
+
+function mergeFavs() {
+  Object.values(S.favs).forEach(v => { if (!S.videos.has(v.id)) S.videos.set(v.id, { ...v, extra:true }); });
+}
+function toggleFav(id) {
+  if (S.favs[id]) delete S.favs[id];
+  else { const v = S.videos.get(id); if (v) { const { extra, ...c } = v; S.favs[id] = c; } }
+  jput("sha_fav", S.favs);
+}
+
+function card(v) {
+  const seen = !!S.seen[v.id], fav = !!S.favs[v.id];
+  const tags = `<span class="tag ${v.src === "fan" ? "f" : "o"}">${v.src === "fan" ? "팬 쇼츠" : "공식"}</span>` + (v.src === "official" && v.named ? `<span class="tag n">하영</span>` : "") + (seen ? `<span class="tag">시청함</span>` : "");
+  return `<article class="card${seen ? " seen" : ""}"><button class="open" data-id="${v.id}"><span class="thumb"><img loading="lazy" alt="" src="https://i.ytimg.com/vi/${v.id}/mqdefault.jpg"><span class="dur">${fmtDur(v.sec)}</span></span>
+  <h3>${esc(v.t)}</h3><span class="info">${tags}<span>${esc(v.ch)}</span><span>${fmtDate(v.pub)}</span><span>조회수 ${fmtViews(v.views)}</span></span></button>
+  <button class="fav" data-fav="${v.id}" aria-pressed="${fav}" aria-label="즐겨찾기">${fav ? "♥" : "♡"}</button></article>`;
+}
+
+function render() {
+  const all = [...S.videos.values()];
+  const inCat = (v, c) => c === "fav" ? !!S.favs[v.id] : v.extra ? false : c === "all" ? (v.src === "official" || S.fan) : v.cat === c;
+  const pre = all.filter(v => (S.fmt === "all" || (S.fmt === "short") === (v.sec <= 60)) && (S.scope === "all" || v.named || S.cat === "fav") && (!S.q || (v.t + " " + v.ch).toLowerCase().includes(S.q)));
+  const base = S.chan ? pre.filter(v => v.cid === S.chan) : pre;
+  $("#cats").innerHTML = CATS.map(([k, l]) => `<button data-c="${k}" class="${S.cat === k ? "on" : ""}">${l}<span>${base.filter(v => inCat(v, k)).length}</span></button>`).join("");
+
+  const cnt = new Map();
+  pre.filter(v => inCat(v, S.cat)).forEach(v => { const c = cnt.get(v.cid) || { id:v.cid, n:v.ch, o:0, k:0 }; c.k++; if (v.src === "official") c.o = 1; cnt.set(v.cid, c); });
+  const chs = [...cnt.values()].sort((x, y) => y.o - x.o || y.k - x.k).slice(0, 24);
+  $("#chips").innerHTML = chs.length > 1 || S.chan ? `<button data-ch="" class="${S.chan ? "" : "on"}">전체 채널</button>` + chs.map(c => `<button data-ch="${c.id}" class="${S.chan === c.id ? "on" : ""}">${esc(c.n)}<small>${c.k}</small></button>`).join("") : "";
+
+  const a = base.filter(v => inCat(v, S.cat));
+  a.sort({ new:(x,y)=>y.pub.localeCompare(x.pub), old:(x,y)=>x.pub.localeCompare(y.pub), views:(x,y)=>y.views-x.views }[S.sort]);
+  const groups = [];
+  if (S.cat === "fav") groups.push(["즐겨찾기", a]);
+  else {
+    const fresh = a.filter(v => !S.seen[v.id]), seen = a.filter(v => S.seen[v.id]);
+    const off = fresh.filter(v => v.src === "official"), fan = fresh.filter(v => v.src === "fan");
+    if (S.sort === "views") groups.push(["공식 영상", off]);
+    else { const m = new Map(); off.forEach(v => { const y = v.pub.slice(0,4) + "년"; if (!m.has(y)) m.set(y, []); m.get(y).push(v); }); m.forEach((l, y) => groups.push([y, l])); }
+    groups.push(["팬 쇼츠", fan], ["이미 본 영상", seen]);
+  }
+  const shown = groups.filter(g => g[1].length);
+  S.flat = shown.flatMap(g => g[1]);
+  $("#list").innerHTML = shown.map(([h, l]) => `<h2 class="gh">${h}<small>${l.length}개</small></h2><div class="grid">${l.map(card).join("")}</div>`).join("")
+    || `<p class="empty">${S.cat === "fav" ? "즐겨찾기한 영상이 없어요. 카드의 ♡를 눌러 추가해 보세요." : "조건에 맞는 영상이 없어요. 필터를 바꿔 보세요."}</p>`;
+
+  const latest = all.filter(v => v.src === "official" && !v.extra && !S.seen[v.id]).sort((x, y) => y.pub.localeCompare(x.pub))[0];
+  $("#hero").innerHTML = latest && S.cat === "all" && !S.q && !S.chan ? `<button class="open hero" data-id="${latest.id}"><span class="thumb"><img alt="" src="https://i.ytimg.com/vi/${latest.id}/hqdefault.jpg"><span class="dur">${fmtDur(latest.sec)}</span></span><span><span class="tag o">아직 안 본 최신 공식 영상</span><h2>${esc(latest.t)}</h2><p>${esc(latest.ch)}, ${fmtDate(latest.pub)}</p></span></button>` : "";
+
+  const nOff = all.filter(v => v.src === "official" && !v.extra).length, nFan = all.filter(v => v.src === "fan" && !v.extra).length;
+  $("#meta").textContent = `공식 ${nOff}개, 팬 쇼츠 ${nFan}개, 즐겨찾기 ${Object.keys(S.favs).length}개`;
+  $("#more").hidden = !Object.values(S.official).some(s => s.next !== null);
+}
+
+/* 재생 창 */
+function syncFav() {
+  const v = S.flat[S.cur], b = $("#favd"); if (!v) return;
+  b.setAttribute("aria-pressed", !!S.favs[v.id]); b.textContent = S.favs[v.id] ? "♥ 즐겨찾기" : "♡ 즐겨찾기";
+}
+function play() {
+  const v = S.flat[S.cur]; if (!v) return;
+  const h = HOSTS[S.host] || HOSTS.yt;
+  S.seen[v.id] = Date.now(); jput("sha_seen", S.seen);
+  $("#dt").textContent = v.t;
+  const l = $("#yt"); l.href = h.watch + v.id; l.textContent = h.name + "에서 보기";
+  syncFav();
+  const p = $("#player"); p.className = "player" + (v.sec <= 60 ? " v" : "");
+  p.innerHTML = v.emb
+    ? `<iframe src="${h.embed}${v.id}?autoplay=1&rel=0" title="${esc(v.t)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`
+    : `<p style="padding:40px;text-align:center">업로더가 퍼가기를 막은 영상이에요.<br>아래 '${h.name}에서 보기'로 봐 주세요.</p>`;
+}
+function openVideo(id) {
+  const v = S.videos.get(id); if (!v) return;
+  S.cur = S.flat.findIndex(x => x.id === id);
+  if (S.cur < 0) { S.flat = [v]; S.cur = 0; }
+  play(); $("#dlg").showModal();
+}
+const step = d => { const n = S.cur + d; if (n >= 0 && n < S.flat.length) { S.cur = n; play(); } };
+
+document.addEventListener("click", e => {
+  const f = e.target.closest("[data-fav]"); if (f) { toggleFav(f.dataset.fav); render(); return; }
+  const c = e.target.closest("[data-c]"); if (c) { S.cat = c.dataset.c; S.chan = ""; render(); return; }
+  const h = e.target.closest("[data-ch]"); if (h) { S.chan = h.dataset.ch; render(); return; }
+  const v = e.target.closest("[data-id]"); if (v) openVideo(v.dataset.id);
+});
+$("#favd").onclick = () => { const v = S.flat[S.cur]; if (v) { toggleFav(v.id); syncFav(); } };
+$("#prev").onclick = () => step(-1);
+$("#next").onclick = () => step(1);
+$("#close").onclick = () => $("#dlg").close();
+$("#dlg").addEventListener("close", () => { $("#player").innerHTML = ""; render(); });
+$("#dlg").addEventListener("keydown", e => { if (e.key === "ArrowLeft") step(-1); if (e.key === "ArrowRight") step(1); });
+$("#fmt").onchange = e => { S.fmt = e.target.value; render(); };
+$("#scope").onchange = e => { S.scope = e.target.value; render(); };
+$("#sort").onchange = e => { S.sort = e.target.value; render(); };
+$("#fan").onchange = e => { S.fan = e.target.checked; render(); };
+$("#q").oninput = e => { S.q = e.target.value.trim().toLowerCase(); render(); };
+$("#host").value = S.host;
+$("#host").onchange = e => { S.host = e.target.value; localStorage.setItem("sha_host", S.host); };
+$("#clearseen").onclick = () => { S.seen = {}; jput("sha_seen", S.seen); render(); };
+$("#refresh").onclick = () => { localStorage.removeItem("sha_off2"); start(); };
+$("#more").onclick = async () => {
+  const b = $("#more"); b.disabled = true; b.textContent = "불러오는 중…";
+  try { for (const st of Object.values(S.official)) await loadUploads(st, 2); saveOff(); render(); } catch (e) { showErr(e); }
+  b.disabled = false; b.textContent = "공식 영상 더 불러오기";
+};
+
+/* 안내와 오류 */
+function showSetup() {
+  $("#note").innerHTML = `<div class="box"><b>처음 한 번만 YouTube API 키가 필요해요</b><ol>
+   <li>Google Cloud Console에서 새 프로젝트를 만들어요.</li>
+   <li>'API 및 서비스'에서 <b>YouTube Data API v3</b>를 사용 설정해요.</li>
+   <li>'사용자 인증 정보'에서 API 키를 만들고, 웹사이트 제한(HTTP 리퍼러)에 이 사이트 주소를 넣어요.</li></ol>
+   <input id="k" type="password" placeholder="API 키 붙여넣기" autocomplete="off">
+   <button class="btn" id="ks" type="button">저장하고 시작</button>
+   <p style="color:var(--sub);font-size:13px;margin:8px 0 0">입력한 키는 이 브라우저에만 저장돼요. 모두에게 보이게 하려면 코드의 CONFIG.apiKey에 넣어요.</p></div>`;
+  $("#ks").onclick = () => { const k = $("#k").value.trim(); if (k) { localStorage.setItem("sha_key", k); start(); } };
+}
+function showErr(e) {
+  const m = e.reason === "quotaExceeded" ? "오늘 API 할당량을 모두 썼어요. 한국 시간 오후 4~5시쯤 초기화돼요."
+    : /key|referer|API/i.test(e.message) ? "API 키 또는 리퍼러 제한을 확인해 주세요. (" + e.message + ")" : e.message;
+  $("#note").innerHTML = `<div class="box err">${esc(m)} <button class="btn" id="rk" type="button">키 다시 입력</button></div>`;
+  $("#rk").onclick = () => { localStorage.removeItem("sha_key"); showSetup(); };
+  $("#meta").textContent = "불러오지 못했어요";
+}
+async function start() {
+  if (!key()) { showSetup(); return; }
+  $("#note").innerHTML = "";
+  try { await load(); } catch (e) { showErr(e); }
+}
+const setTheme = n => { document.documentElement.dataset.theme = n; localStorage.setItem("sha_theme", n); document.querySelectorAll("#themes button").forEach(b => b.setAttribute("aria-pressed", b.dataset.t === n)); };
+$("#themes").onclick = e => { const b = e.target.closest("[data-t]"); if (b) setTheme(b.dataset.t); };
+setTheme(localStorage.getItem("sha_theme") || "lilac");
+start();
+</script>
+</body>
+</html>
