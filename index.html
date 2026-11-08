@@ -129,7 +129,9 @@ const CONFIG = {
   apiKey: "",                       // 발급받은 YouTube Data API 키를 넣거나, 비워 두고 사이트에서 직접 입력
   names: ["송하영", "song hayoung", "hayoung", "하영"],       // 공식 영상에서 '하영 포함'으로 표시할 단어
   official: [                       // 공식 채널 목록 (handle, id 중 하나. 못 찾으면 search 이름으로 검색)
-    { handle: "@fromis_9", search: "Official fromis_9" }
+    { handle: "@fromis_9", search: "Official fromis_9" },
+    { search: "스튜디오 프로미스나인" },
+    { search: "방판소녀들" }
   ],
   fanQueries: ["송하영 쇼츠", "송하영 직캠 shorts", "Song Hayoung shorts"],  // 팬 쇼츠 검색어 (비우면 팬 쇼츠 끔)
   fanMaxSec: 180,                   // 팬 영상은 이 길이 이하(쇼츠)만 사용
@@ -205,7 +207,9 @@ async function resolve(c) {
     const ids = s.items.map(i => i.snippet.channelId).join(",");
     if (ids) add((await yt("channels", { part:P, id:ids })).items);
   }
-  const it = usable().sort((x, y) => (/fromis/i.test(y.snippet.title) - /fromis/i.test(x.snippet.title)) || ((+y.statistics.subscriberCount || 0) - (+x.statistics.subscriberCount || 0)))[0];
+  const nk = s => String(s || "").toLowerCase().replace(/\s/g, "");
+  const score = f => c.search && nk(f.snippet.title).includes(nk(c.search)) ? 2 : /fromis|프로미스/i.test(f.snippet.title) ? 1 : 0;
+  const it = usable().sort((x, y) => score(y) - score(x) || ((+y.statistics.subscriberCount || 0) - (+x.statistics.subscriberCount || 0)))[0];
   if (!it) throw Object.assign(new Error("공식 채널을 찾지 못했어요: " + ck), { reason:"playlistNotFound" });
   const r = { id:it.id, title:it.snippet.title, up:it.contentDetails.relatedPlaylists.uploads };
   cache[ck] = r; jput("sha_ch2", cache);
@@ -230,14 +234,24 @@ async function loadFan() {
   await hydrate([...ids], "fan");
 }
 
-const saveOff = () => cput("sha_off2", { videos:[...S.videos.values()].filter(v => v.src === "official" && !v.extra), state:S.official });
+const saveOff = () => cput("sha_off2", { sig:JSON.stringify(jget("sha_chans", CONFIG.official)), videos:[...S.videos.values()].filter(v => v.src === "official" && !v.extra), state:S.official });
 
 async function load() {
   $("#meta").textContent = "불러오는 중…";
   S.videos.clear(); S.official = {};
+  let chanNote = "";
   const off = cget("sha_off2", CONFIG.cacheMin);
-  if (off) { off.videos.forEach(v => S.videos.set(v.id, v)); S.official = off.state; }
-  else { for (const c of jget("sha_chans", CONFIG.official)) await loadUploads(await resolve(c), CONFIG.pages); saveOff(); }
+  if (off && off.sig === JSON.stringify(jget("sha_chans", CONFIG.official))) { off.videos.forEach(v => S.videos.set(v.id, v)); S.official = off.state; }
+  else {
+    const miss = [];
+    for (const c of jget("sha_chans", CONFIG.official)) {
+      try { await loadUploads(await resolve(c), CONFIG.pages); }
+      catch (e) { if (e.reason === "quotaExceeded" || /key|referer/i.test(e.message)) throw e; miss.push(c.id || c.handle || c.search); }
+    }
+    if (!Object.keys(S.official).length) throw Object.assign(new Error("공식 채널을 찾지 못했어요"), { reason:"playlistNotFound" });
+    if (miss.length) chanNote = "못 찾은 채널: " + miss.join(", ") + ". 왼쪽 '공식 채널 바꾸기'에서 주소를 직접 넣어 주세요.";
+    saveOff();
+  }
   mergeFavs(); render();
   let fanNote = "";
   const fan = cget("sha_fan2", CONFIG.fanCacheMin);
@@ -246,7 +260,8 @@ async function load() {
     try { await loadFan(); cput("sha_fan2", [...S.videos.values()].filter(v => v.src === "fan")); }
     catch (e) { fanNote = "팬 쇼츠는 불러오지 못했어요(" + (e.reason === "quotaExceeded" ? "오늘 할당량 소진" : e.message) + "). 공식 영상은 정상이에요."; }
   }
-  $("#note").innerHTML = fanNote ? `<div class="box err">${esc(fanNote)}</div>` : "";
+  const nt = [chanNote, fanNote].filter(Boolean).join(" ");
+  $("#note").innerHTML = nt ? `<div class="box err">${esc(nt)}</div>` : "";
   mergeFavs();
   render();
 }
