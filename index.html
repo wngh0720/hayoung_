@@ -78,10 +78,21 @@ dialog::backdrop{background:rgba(10,8,30,.78)}
 .dbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 18px}
 .dbar b{flex:1 1 220px;font-weight:650;font-size:15px;line-height:1.35}
 .dbar button,.dbar a{background:#2b2754;color:#fff;border:0;border-radius:999px;padding:8px 14px;cursor:pointer;text-decoration:none;font-size:14px;white-space:nowrap}
+#chnav{display:grid;gap:2px}
+#chnav:empty{display:none}
+#chnav h3{margin:8px 14px 4px;font-size:12.5px;font-weight:600;color:var(--sub)}
+#chnav button{display:flex;justify-content:space-between;gap:8px;width:100%;padding:9px 14px;border:0;border-radius:12px;background:transparent;text-align:left;cursor:pointer;font-weight:500;word-break:keep-all}
+#chnav button:hover{background:var(--bg)}
+#chnav button.on{background:var(--on);color:var(--onink);font-weight:700}
+#chnav span{opacity:.6;font-variant-numeric:tabular-nums}
+aside{max-height:calc(100vh - 32px);overflow-y:auto}
 @media(prefers-reduced-motion:no-preference){.card{transition:transform .18s,box-shadow .18s}.card:hover{transform:translateY(-4px)}}
 @media(max-width:860px){
  .wrap{grid-template-columns:1fr;gap:20px;padding:20px 16px 60px}
- aside{position:static}
+ aside{position:static;max-height:none}
+ #chnav{display:flex;overflow-x:auto;gap:4px;align-items:center}
+ #chnav button{width:auto;white-space:nowrap}
+ #chnav h3{white-space:nowrap;margin:0 6px}
  #cats{display:flex;overflow-x:auto;gap:4px}
  #cats button{width:auto;white-space:nowrap}
  .hero{grid-template-columns:1fr}
@@ -99,6 +110,7 @@ dialog::backdrop{background:rgba(10,8,30,.78)}
 <main class="wrap">
  <aside>
   <nav id="cats" aria-label="영상 분류"></nav>
+  <nav id="chnav" aria-label="채널"></nav>
   <label>검색<input id="q" type="search" placeholder="제목이나 채널 이름"></label>
   <label>형식<select id="fmt"><option value="all">전체</option><option value="long">일반 영상</option><option value="short">쇼츠(60초 이하)</option></select></label>
   <label>범위<select id="scope"><option value="all">공식 채널 전체 영상</option><option value="named">제목·설명에 하영이 들어간 영상</option></select></label>
@@ -111,7 +123,6 @@ dialog::backdrop{background:rgba(10,8,30,.78)}
  </aside>
  <section>
   <div id="note"></div>
-  <div id="chips" class="chips"></div>
   <div id="hero"></div>
   <div id="list"></div>
   <button id="more" class="btn" type="button" hidden>공식 영상 더 불러오기</button>
@@ -291,9 +302,11 @@ function render() {
   $("#cats").innerHTML = CATS.map(([k, l]) => `<button data-c="${k}" class="${S.cat === k ? "on" : ""}">${l}<span>${base.filter(v => inCat(v, k)).length}</span></button>`).join("");
 
   const cnt = new Map();
-  pre.filter(v => inCat(v, S.cat)).forEach(v => { const c = cnt.get(v.cid) || { id:v.cid, n:v.ch, o:0, k:0 }; c.k++; if (v.src === "official") c.o = 1; cnt.set(v.cid, c); });
-  const chs = [...cnt.values()].sort((x, y) => y.o - x.o || y.k - x.k).slice(0, 24);
-  $("#chips").innerHTML = chs.length > 1 || S.chan ? `<button data-ch="" class="${S.chan ? "" : "on"}">전체 채널</button>` + chs.map(c => `<button data-ch="${c.id}" class="${S.chan === c.id ? "on" : ""}">${esc(c.n)}<small>${c.k}</small></button>`).join("") : "";
+  Object.values(S.official).forEach(s => cnt.set(s.id, { id:s.id, n:s.title, o:1, k:0 }));
+  pre.filter(v => inCat(v, S.cat)).forEach(v => { const c = cnt.get(v.cid) || { id:v.cid, n:v.ch, o:0, k:0 }; c.k++; cnt.set(v.cid, c); });
+  const cb = c => `<button data-ch="${c.id}" class="${S.chan === c.id ? "on" : ""}">${esc(c.n)}<span>${c.k}</span></button>`;
+  const offc = [...cnt.values()].filter(c => c.o).sort((x, y) => y.k - x.k), fanc = [...cnt.values()].filter(c => !c.o).sort((x, y) => y.k - x.k).slice(0, 15);
+  $("#chnav").innerHTML = (offc.length ? `<h3>공식 채널</h3><button data-ch="" class="${S.chan ? "" : "on"}">전체 채널</button>` + offc.map(cb).join("") : "") + (fanc.length ? `<h3>팬 채널(쇼츠)</h3>` + fanc.map(cb).join("") : "");
 
   const a = base.filter(v => inCat(v, S.cat));
   a.sort({ new:(x,y)=>y.pub.localeCompare(x.pub), old:(x,y)=>x.pub.localeCompare(y.pub), views:(x,y)=>y.views-x.views }[S.sort]);
