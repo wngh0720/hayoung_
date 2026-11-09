@@ -188,6 +188,8 @@ const fmtDur = n => { const h = Math.floor(n/3600), m = Math.floor(n%3600/60), s
 const fmtViews = n => n >= 1e8 ? (n/1e8).toFixed(1)+"억" : n >= 1e4 ? (n/1e4).toFixed(1)+"만" : n >= 1e3 ? (n/1e3).toFixed(1)+"천" : n;
 const fmtDate = d => new Date(d).toLocaleDateString("ko-KR", { year:"numeric", month:"2-digit", day:"2-digit" });
 
+const isShort = v => v.short ?? v.sec <= 60;
+
 function classify(t) {
   t = t.toLowerCase();
   if (/behind|비하인드|vlog|브이로그|making|메이킹|jacket|촬영|photoshoot|fromis_ room/.test(t)) return "behind";
@@ -199,7 +201,7 @@ function classify(t) {
 const loose = t => CONFIG.names.some(n => t.includes(n));
 const strict = t => t.includes("송하영") || t.includes("song hayoung") || (/하영|hayoung/.test(t) && /프로미스|fromis/.test(t));
 
-async function hydrate(ids, src) {
+async function hydrate(ids, src, mode) {
   const officialIds = new Set(Object.keys(S.official));
   for (let i = 0; i < ids.length; i += 50) {
     const j = await yt("videos", { part:"snippet,contentDetails,statistics,status", id:ids.slice(i, i+50).join(","), maxResults:50 });
@@ -208,7 +210,7 @@ async function hydrate(ids, src) {
       const sn = it.snippet, text = (sn.title + " " + (sn.description || "")).toLowerCase(), sec = secOf(it.contentDetails.duration);
       if (src === "fan" && (sec > CONFIG.fanMaxSec || !strict(text) || officialIds.has(sn.channelId))) continue;
       S.videos.set(it.id, { id:it.id, t:sn.title, ch:sn.channelTitle, cid:sn.channelId, pub:sn.publishedAt, sec, views:+(it.statistics?.viewCount||0),
-        emb:it.status?.embeddable !== false, src, named: src === "fan" ? true : loose(text), cat: src === "fan" ? "fan" : classify(sn.title) });
+        emb:it.status?.embeddable !== false, src, short:(mode === "short" ? true : mode === "long" ? false : undefined), named: src === "fan" ? true : loose(text), cat: src === "fan" ? "fan" : classify(sn.title) });
     }
   }
 }
@@ -235,12 +237,16 @@ async function resolve(c) {
   return r;
 }
 
-async function loadUploads(ch, pages) {
+async function loadUploads(ch, pages, mode = "all") {
   const st = S.official[ch.id] || (S.official[ch.id] = { ...ch, next: undefined });
-  for (let n = 0; n < pages && st.next !== null; n++) {
-    const j = await yt("playlistItems", { part:"contentDetails", playlistId:st.up, maxResults:50, ...(st.next ? { pageToken:st.next } : {}) });
-    st.next = j.nextPageToken || null;
-    await hydrate(j.items.map(i => i.contentDetails.videoId), "official");
+  const nk = mode === "short" ? "nextS" : mode === "long" ? "nextL" : "next";
+  const pl = mode === "short" ? "UUSH" + st.id.slice(2) : mode === "long" ? "UULF" + st.id.slice(2) : st.up;
+  for (let n = 0; n < pages && st[nk] !== null; n++) {
+    let j;
+    try { j = await yt("playlistItems", { part:"contentDetails", playlistId:pl, maxResults:50, ...(st[nk] ? { pageToken:st[nk] } : {}) }); }
+    catch (e) { if (mode !== "all" && e.reason === "playlistNotFound") { st[nk] = null; break; } throw e; }
+    st[nk] = j.nextPageToken || null;
+    await hydrate(j.items.map(i => i.contentDetails.videoId), "official", mode);
   }
 }
 
@@ -314,7 +320,7 @@ function render() {
   const all = [...S.videos.values()];
   const inCat = (v, c) => c === "fav" ? !!S.favs[v.id] : c === "seen" ? !!S.seen[v.id] : v.extra ? false : c === "all" ? (v.src === "official" || S.fan) : v.cat === c;
   const pre0 = all.filter(v => (S.scope === "all" || v.named || S.cat === "fav" || S.cat === "seen") && (!S.q || (v.t + " " + v.ch).toLowerCase().includes(S.q)));
-  const pre = pre0.filter(v => S.fmt === "all" || (S.fmt === "short") === (v.sec <= 60));
+  const pre = pre0.filter(v => S.fmt === "all" || (S.fmt === "short") === (isShort(v)));
   const base = S.chan ? pre.filter(v => v.cid === S.chan) : pre;
   $("#cats").innerHTML = CATS.map(([k, l]) => `<button data-c="${k}" class="${S.cat === k ? "on" : ""}">${l}<span>${base.filter(v => inCat(v, k)).length}</span></button>`).join("");
 
@@ -325,7 +331,7 @@ function render() {
   const offc = [...cnt.values()].filter(c => c.o).sort((x, y) => y.k - x.k), fanc = [...cnt.values()].filter(c => !c.o).sort((x, y) => y.k - x.k).slice(0, 15);
   const chName = (cnt.get(S.chan) || {}).n || "";
   const inChan = S.chan ? pre0.filter(v => inCat(v, S.cat) && v.cid === S.chan) : [];
-  $("#subtabs").innerHTML = S.chan ? `<h2 class="chtitle">${esc(chName)}</h2><div class="tabs">` + [["all","전체",inChan.length],["long","영상",inChan.filter(v => v.sec > 60).length],["short","쇼츠",inChan.filter(v => v.sec <= 60).length]].map(([k, l, n]) => `<button data-fmt="${k}" class="${S.fmt === k ? "on" : ""}">${l}<span>${n}</span></button>`).join("") + `</div>` : "";
+  $("#subtabs").innerHTML = S.chan ? `<h2 class="chtitle">${esc(chName)}</h2><div class="tabs">` + [["all","전체",inChan.length],["long","영상",inChan.filter(v => !isShort(v)).length],["short","쇼츠",inChan.filter(v => isShort(v)).length]].map(([k, l, n]) => `<button data-fmt="${k}" class="${S.fmt === k ? "on" : ""}">${l}<span>${n}</span></button>`).join("") + `</div>` : "";
   $("#chnav").innerHTML = (offc.length ? `<h3>공식 채널</h3><button data-ch="" class="${S.chan ? "" : "on"}">전체 채널</button>` + offc.map(cb).join("") : "") + (fanc.length ? `<h3>팬 채널(쇼츠)</h3>` + fanc.map(cb).join("") : "");
 
   const a = base.filter(v => inCat(v, S.cat));
@@ -351,7 +357,7 @@ function render() {
   const nOff = all.filter(v => v.src === "official" && !v.extra).length, nFan = all.filter(v => v.src === "fan" && !v.extra).length;
   const ct = Object.values(S.official).map(s => s.title).join(", ");
   $("#meta").textContent = `공식 ${nOff}개${ct ? " (" + ct + ")" : ""}, 팬 쇼츠 ${nFan}개, 즐겨찾기 ${Object.keys(S.favs).length}개`;
-  $("#more").hidden = !Object.values(S.official).some(s => s.next !== null);
+  $("#more").hidden = ["fan", "fav", "seen"].includes(S.cat) || !Object.values(S.official).filter(s => !S.chan || s.id === S.chan).some(s => s[modeKey()] !== null);
   setTimeout(checkMore, 0);
 }
 
@@ -367,7 +373,7 @@ function play() {
   $("#dt").textContent = v.t;
   const l = $("#yt"); l.href = h.watch + v.id; l.textContent = h.name + "에서 보기";
   syncFav();
-  const p = $("#player"); p.className = "player" + (v.sec <= 60 ? " v" : "");
+  const p = $("#player"); p.className = "player" + (isShort(v) ? " v" : "");
   p.innerHTML = v.emb
     ? `<iframe src="${h.embed}${v.id}?autoplay=1&rel=0" title="${esc(v.t)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`
     : `<p style="padding:40px;text-align:center">업로더가 퍼가기를 막은 영상이에요.<br>아래 '${h.name}에서 보기'로 봐 주세요.</p>`;
@@ -388,9 +394,9 @@ const step = d => { const n = S.cur + d; if (n >= 0 && n < S.flat.length) { S.cu
 
 document.addEventListener("click", e => {
   const f = e.target.closest("[data-fav]"); if (f) { toggleFav(f.dataset.fav); render(); return; }
-  const m = e.target.closest("[data-fmt]"); if (m) { S.fmt = m.dataset.fmt; $("#fmt").value = S.fmt; render(); return; }
+  const m = e.target.closest("[data-fmt]"); if (m) { S.fmt = m.dataset.fmt; $("#fmt").value = S.fmt; render(); ensureMode(); return; }
   const c = e.target.closest("[data-c]"); if (c) { S.cat = c.dataset.c; S.chan = ""; render(); return; }
-  const h = e.target.closest("[data-ch]"); if (h) { S.chan = h.dataset.ch; render(); return; }
+  const h = e.target.closest("[data-ch]"); if (h) { S.chan = h.dataset.ch; render(); ensureMode(); return; }
   const v = e.target.closest("[data-id]"); if (v) openVideo(v.dataset.id);
 });
 $("#favd").onclick = () => { const v = S.flat[S.cur]; if (v) { toggleFav(v.id); syncFav(); } };
@@ -399,7 +405,7 @@ $("#next").onclick = () => step(1);
 $("#close").onclick = () => $("#dlg").close();
 $("#dlg").addEventListener("close", () => { $("#player").innerHTML = ""; render(); });
 $("#dlg").addEventListener("keydown", e => { if (e.key === "ArrowLeft") step(-1); if (e.key === "ArrowRight") step(1); });
-$("#fmt").onchange = e => { S.fmt = e.target.value; render(); };
+$("#fmt").onchange = e => { S.fmt = e.target.value; render(); ensureMode(); };
 $("#scope").onchange = e => { S.scope = e.target.value; render(); };
 $("#sort").onchange = e => { S.sort = e.target.value; render(); };
 $("#fan").onchange = e => { S.fan = e.target.checked; render(); };
@@ -416,10 +422,20 @@ $("#chset").onclick = () => {
 };
 $("#refresh").onclick = () => { localStorage.removeItem("sha_off2"); start(); };
 let busy = false, autoOff = false;
+const modeKey = () => S.fmt === "short" ? "nextS" : S.fmt === "long" ? "nextL" : "next";
+async function ensureMode() {
+  if (S.fmt === "all" || busy) return;
+  const sts = Object.values(S.official).filter(s => (!S.chan || s.id === S.chan) && s[modeKey()] === undefined);
+  if (!sts.length) return;
+  busy = true;
+  try { for (const st of sts) await loadUploads(st, 1, S.fmt); saveOff(); render(); }
+  catch (e) { autoOff = true; showErr(e); }
+  busy = false;
+}
 async function loadMore() {
   const b = $("#more"); if (busy || b.hidden) return;
   busy = true; b.disabled = true; b.textContent = "불러오는 중…";
-  try { for (const st of Object.values(S.official)) await loadUploads(st, 1); saveOff(); render(); }
+  try { for (const st of Object.values(S.official).filter(s => !S.chan || s.id === S.chan)) await loadUploads(st, 1, S.fmt); saveOff(); render(); }
   catch (e) { autoOff = true; showErr(e); }
   busy = false; b.disabled = false; b.textContent = "공식 영상 더 불러오기";
 }
