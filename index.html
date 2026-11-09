@@ -87,6 +87,7 @@ dialog::backdrop{background:rgba(10,8,30,.78)}
 .tabs button{background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;padding:10px 16px;cursor:pointer;font-weight:600;color:var(--sub)}
 .tabs button.on{color:var(--ink);border-color:var(--accent)}
 .tabs span{margin-left:6px;opacity:.6;font-variant-numeric:tabular-nums}
+#cats button.sub{padding-left:30px;font-size:14px}
 #chnav{display:grid;gap:2px}
 #chnav:empty{display:none}
 #chnav h3{margin:8px 14px 4px;font-size:12.5px;font-weight:600;color:var(--sub)}
@@ -123,7 +124,8 @@ aside{max-height:calc(100vh - 32px);overflow-y:auto}
   <label>검색<input id="q" type="search" placeholder="제목이나 채널 이름"></label>
   <label>형식<select id="fmt"><option value="all">전체</option><option value="long">일반 영상</option><option value="short">쇼츠(60초 이하)</option></select></label>
   <label>범위<select id="scope"><option value="all">공식 채널 전체 영상</option><option value="named">제목·설명에 하영이 들어간 영상</option></select></label>
-  <label>정렬<select id="sort"><option value="new">최신순</option><option value="old">오래된순</option><option value="views">조회수순</option></select></label>
+  <label>정렬<select id="sort"><option value="new">최신순</option><option value="old">오래된순</option><option value="views">조회수순</option><option value="random">무작위</option></select></label>
+  <button id="reshuffle" class="btn" type="button" hidden>다시 섞기</button>
   <label class="chk"><input id="fan" type="checkbox">전체 목록 끝에 팬 쇼츠도 보기</label>
   <label>영상 열기 방식<select id="host"><option value="yo">yout-ube 링크로 열기</option><option value="yt">사이트 안에서 재생(유튜브)</option></select></label>
   <button id="clearseen" class="btn" type="button">시청 기록 지우기</button>
@@ -158,6 +160,7 @@ const CONFIG = {
     { search: "방판소녀들" }
   ],
   fanQueries: ["송하영", "송하영 쇼츠", "송하영 직캠", "송하영 shorts", "Song Hayoung", "프로미스나인 하영", "하냥 프로미스나인", "송사리 프로미스나인 하영", "하냥 직캠"],  // 팬 쇼츠 검색어 (비우면 팬 쇼츠 끔)
+  fanChannelNames: ["하냥", "송사리"],  // 이 이름이 들어간 팬 채널만 따로 항목을 만들고, 나머지는 '기타 팬 쇼츠'로 묶어요
   fanMaxSec: 180,                   // 팬 영상은 이 길이 이하(쇼츠)만 사용
   pages: 1,                         // 처음에 불러올 업로드 페이지 수 (1페이지 = 50개)
   cacheMin: 30, fanCacheMin: 360    // 캐시 시간(분). 길수록 API 할당량을 아껴요
@@ -171,11 +174,11 @@ const HOSTS = {
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const CATS = [["all","전체"],["fav","즐겨찾기"],["seen","책갈피(본 영상)"],["mv","뮤직비디오·티저"],["stage","무대·퍼포먼스"],["series","예능·시리즈"],["behind","비하인드·브이로그"],["etc","기타 공식 영상"],["fan","팬 쇼츠"]];
+const CATS = [["all","전체"],["fav","즐겨찾기"],["seen","책갈피(본 영상)"],["mv","뮤직비디오·티저"],["stage","무대·퍼포먼스"],["series","예능·시리즈"],["behind","비하인드·브이로그"],["etc","기타 공식 영상"],["fan","팬 쇼츠 전체"],["fan_hn","하냥"],["fan_ss","송사리"],["fan_etc","기타 팬 쇼츠"]];
 const jget = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
 const jput = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const S = { videos:new Map(), official:{}, cat:"all", fmt:"all", scope:"all", fan:false, sort:"new", q:"", chan:"", flat:[], cur:0,
-  favs:jget("sha_fav", {}), seen:jget("sha_seen", {}), hist:jget("sha_hist", {}), fanTok:{}, fanCh:{}, host:localStorage.getItem("sha_host") || "yo" };
+  favs:jget("sha_fav", {}), seen:jget("sha_seen", {}), hist:jget("sha_hist", {}), fanTok:{}, fanCh:{}, seed:Math.random() * 1e9 | 0, host:localStorage.getItem("sha_host") || "yo" };
 
 const key = () => CONFIG.apiKey || localStorage.getItem("sha_key") || "";
 const cget = (k, min) => { try { const c = JSON.parse(localStorage.getItem(k)); return c && Date.now() - c.t < min * 6e4 ? c.d : null; } catch { return null; } };
@@ -194,6 +197,11 @@ const fmtViews = n => n >= 1e8 ? (n/1e8).toFixed(1)+"억" : n >= 1e4 ? (n/1e4).t
 const fmtDate = d => new Date(d).toLocaleDateString("ko-KR", { year:"numeric", month:"2-digit", day:"2-digit" });
 
 const isShort = v => v.short ?? v.sec <= 60;
+const fanNamed = v => CONFIG.fanChannelNames.some(n => v.ch.toLowerCase().includes(n.toLowerCase())) || !!S.fanCh[v.cid];
+const ckey = v => v.src === "fan" && !fanNamed(v) ? "__etc" : v.cid;
+const FK = { fan_hn:"hn", fan_ss:"ss", fan_etc:"etc" };
+const isFanCat = c => c === "fan" || c in FK;
+const fanKey = v => v.fk || (/하냥/.test(v.t) ? "hn" : /송사리/.test(v.t) ? "ss" : "etc");
 
 function classify(t) {
   t = t.toLowerCase();
@@ -215,7 +223,7 @@ async function hydrate(ids, src, mode, anyName) {
       const sn = it.snippet, text = (sn.title + " " + (sn.description || "") + " " + (sn.tags || []).join(" ")).toLowerCase(), sec = secOf(it.contentDetails.duration);
       if (src === "fan" && (sec > CONFIG.fanMaxSec || (!anyName && !strict(text)) || officialIds.has(sn.channelId))) continue;
       S.videos.set(it.id, { id:it.id, t:sn.title, ch:sn.channelTitle, cid:sn.channelId, pub:sn.publishedAt, sec, views:+(it.statistics?.viewCount||0),
-        emb:it.status?.embeddable !== false, src, short:(mode === "short" ? true : mode === "long" ? false : undefined), named: src === "fan" ? strict(text) : loose(text), cat: src === "fan" ? "fan" : classify(sn.title) });
+        emb:it.status?.embeddable !== false, src, short:(mode === "short" ? true : mode === "long" ? false : undefined), fk: src === "fan" ? (/하냥/.test(text) ? "hn" : /송사리/.test(text) ? "ss" : "etc") : undefined, named: src === "fan" ? strict(text) : loose(text), cat: src === "fan" ? "fan" : classify(sn.title) });
     }
   }
 }
@@ -338,33 +346,34 @@ function card(v) {
 
 function render() {
   const all = [...S.videos.values()];
-  const inCat = (v, c) => c === "fav" ? !!S.favs[v.id] : c === "seen" ? !!S.seen[v.id] : v.extra ? false : c === "all" ? (v.src === "official" || S.fan) : v.cat === c;
+  const inCat = (v, c) => c === "fav" ? !!S.favs[v.id] : c === "seen" ? !!S.seen[v.id] : FK[c] ? (!v.extra && v.src === "fan" && fanKey(v) === FK[c]) : v.extra ? false : c === "all" ? (v.src === "official" || S.fan) : v.cat === c;
   const pre0 = all.filter(v => (S.scope === "all" || v.named || S.cat === "fav" || S.cat === "seen") && (!S.q || (v.t + " " + v.ch).toLowerCase().includes(S.q)));
   const pre = pre0.filter(v => S.fmt === "all" || (S.fmt === "short") === (isShort(v)));
-  const base = S.chan ? pre.filter(v => v.cid === S.chan) : pre;
-  $("#cats").innerHTML = CATS.map(([k, l]) => `<button data-c="${k}" class="${S.cat === k ? "on" : ""}">${l}<span>${base.filter(v => inCat(v, k)).length}</span></button>`).join("");
+  const base = S.chan ? pre.filter(v => ckey(v) === S.chan) : pre;
+  $("#cats").innerHTML = CATS.map(([k, l]) => `<button data-c="${k}" class="${S.cat === k ? "on" : ""}${k.startsWith("fan_") ? " sub" : ""}">${l}<span>${base.filter(v => inCat(v, k)).length}</span></button>`).join("");
 
   const cnt = new Map();
   Object.values(S.official).forEach(s => cnt.set(s.id, { id:s.id, n:s.title, o:1, k:0 }));
-  pre.filter(v => inCat(v, S.cat)).forEach(v => { const c = cnt.get(v.cid) || { id:v.cid, n:v.ch, o:0, k:0 }; c.k++; cnt.set(v.cid, c); });
+  pre.filter(v => inCat(v, S.cat)).forEach(v => { const ky = ckey(v), c = cnt.get(ky) || { id:ky, n:ky === "__etc" ? "기타 팬 쇼츠" : v.ch, o:0, k:0 }; c.k++; cnt.set(ky, c); });
   const cb = c => `<button data-ch="${c.id}" class="${S.chan === c.id ? "on" : ""}">${esc(c.n)}<span>${c.k}</span></button>`;
-  const offc = [...cnt.values()].filter(c => c.o).sort((x, y) => y.k - x.k), fanc = [...cnt.values()].filter(c => !c.o).sort((x, y) => y.k - x.k).slice(0, 15);
+  const offc = [...cnt.values()].filter(c => c.o).sort((x, y) => y.k - x.k), fanc = [...cnt.values()].filter(c => !c.o).sort((x, y) => (x.id === "__etc") - (y.id === "__etc") || y.k - x.k);
   const chName = (cnt.get(S.chan) || {}).n || "";
-  const inChan = S.chan ? pre0.filter(v => inCat(v, S.cat) && v.cid === S.chan) : [];
-  $("#subtabs").innerHTML = S.chan ? `<h2 class="chtitle">${esc(chName)}</h2><div class="tabs">` + [["all","전체",inChan.length],["long","영상",inChan.filter(v => !isShort(v)).length],["short","쇼츠",inChan.filter(v => isShort(v)).length]].map(([k, l, n]) => `<button data-fmt="${k}" class="${S.fmt === k ? "on" : ""}">${l}<span>${n}</span></button>`).join("") + `</div>` + (!S.official[S.chan] && S.fanCh[S.chan]?.next !== null ? `<button class="btn" data-fcmore="${S.chan}" type="button">이 채널 쇼츠 더 불러오기</button>` : "") : "";
+  const inChan = S.chan ? pre0.filter(v => inCat(v, S.cat) && ckey(v) === S.chan) : [];
+  $("#subtabs").innerHTML = S.chan ? `<h2 class="chtitle">${esc(chName)}</h2><div class="tabs">` + [["all","전체",inChan.length],["long","영상",inChan.filter(v => !isShort(v)).length],["short","쇼츠",inChan.filter(v => isShort(v)).length]].map(([k, l, n]) => `<button data-fmt="${k}" class="${S.fmt === k ? "on" : ""}">${l}<span>${n}</span></button>`).join("") + `</div>` + (!S.official[S.chan] && S.chan !== "__etc" && S.fanCh[S.chan]?.next !== null ? `<button class="btn" data-fcmore="${S.chan}" type="button">이 채널 쇼츠 더 불러오기</button>` : "") : "";
   $("#chnav").innerHTML = (offc.length ? `<h3>공식 채널</h3><button data-ch="" class="${S.chan ? "" : "on"}">전체 채널</button>` + offc.map(cb).join("") : "") + (fanc.length ? `<h3>팬 채널(쇼츠)</h3>` + fanc.map(cb).join("") : "");
 
   const a = base.filter(v => inCat(v, S.cat));
-  a.sort({ new:(x,y)=>y.pub.localeCompare(x.pub), old:(x,y)=>x.pub.localeCompare(y.pub), views:(x,y)=>y.views-x.views }[S.sort]);
+  const rnd = id => { let h = S.seed; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
+  a.sort({ new:(x,y)=>y.pub.localeCompare(x.pub), old:(x,y)=>x.pub.localeCompare(y.pub), views:(x,y)=>y.views-x.views, random:(x,y)=>rnd(x.id)-rnd(y.id) }[S.sort]);
   const groups = [];
   if (S.cat === "fav") groups.push(["즐겨찾기", a]);
   else if (S.cat === "seen") { a.sort((x, y) => S.seen[y.id] - S.seen[x.id]); groups.push(["최근에 본 순", a]); }
   else {
     const fresh = a;
     const off = fresh.filter(v => v.src === "official"), fan = fresh.filter(v => v.src === "fan");
-    if (S.sort === "views") groups.push(["공식 영상", off]);
+    if (S.sort === "views" || S.sort === "random") groups.push([S.sort === "random" ? "무작위로 보기" : "공식 영상", off]);
     else { const m = new Map(); off.forEach(v => { const y = v.pub.slice(0,4) + "년"; if (!m.has(y)) m.set(y, []); m.get(y).push(v); }); m.forEach((l, y) => groups.push([y, l])); }
-    groups.push(["팬 쇼츠", fan]);
+    groups.push([isFanCat(S.cat) && S.cat !== "fan" ? CATS.find(c => c[0] === S.cat)[1] : "팬 쇼츠", fan]);
   }
   const shown = groups.filter(g => g[1].length);
   S.flat = shown.flatMap(g => g[1]);
@@ -377,8 +386,9 @@ function render() {
   const nOff = all.filter(v => v.src === "official" && !v.extra).length, nFan = all.filter(v => v.src === "fan" && !v.extra).length;
   const ct = Object.values(S.official).map(s => s.title).join(", ");
   $("#meta").textContent = `공식 ${nOff}개${ct ? " (" + ct + ")" : ""}, 팬 쇼츠 ${nFan}개, 즐겨찾기 ${Object.keys(S.favs).length}개`;
-  $("#more").hidden = ["fan", "fav", "seen"].includes(S.cat) || !Object.values(S.official).filter(s => !S.chan || s.id === S.chan).some(s => s[modeKey()] !== null);
-  $("#fanmore").hidden = S.cat !== "fan" || !CONFIG.fanQueries.length || !(Object.values(S.fanTok).length === 0 || Object.values(S.fanTok).some(x => x !== null));
+  $("#more").hidden = isFanCat(S.cat) || ["fav", "seen"].includes(S.cat) || !Object.values(S.official).filter(s => !S.chan || s.id === S.chan).some(s => s[modeKey()] !== null);
+  $("#reshuffle").hidden = S.sort !== "random";
+  $("#fanmore").hidden = !isFanCat(S.cat) || !CONFIG.fanQueries.length || !(Object.values(S.fanTok).length === 0 || Object.values(S.fanTok).some(x => x !== null));
   setTimeout(checkMore, 0);
 }
 
@@ -430,6 +440,7 @@ $("#dlg").addEventListener("keydown", e => { if (e.key === "ArrowLeft") step(-1)
 $("#fmt").onchange = e => { S.fmt = e.target.value; render(); ensureMode(); };
 $("#scope").onchange = e => { S.scope = e.target.value; render(); };
 $("#sort").onchange = e => { S.sort = e.target.value; render(); };
+$("#reshuffle").onclick = () => { S.seed = Math.random() * 1e9 | 0; render(); };
 $("#fan").onchange = e => { S.fan = e.target.checked; render(); };
 $("#q").oninput = e => { S.q = e.target.value.trim().toLowerCase(); render(); };
 $("#host").value = S.host;
