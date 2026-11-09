@@ -284,7 +284,31 @@ async function loadFanChannel(cid, pages = 1) {
     await hydrate(j.items.map(i => i.contentDetails.videoId), "fan", "short", true);
   }
 }
-const saveFan = () => cput("sha_fan5", { v:[...S.videos.values()].filter(v => v.src === "fan" && !v.extra), tok:S.fanTok, ch:S.fanCh });
+const normName = s => String(s || "").replace(/\s/g, "").toLowerCase();
+async function looksFan(cid) {
+  try {
+    const j = await yt("playlistItems", { part:"contentDetails", playlistId:"UU" + cid.slice(2), maxResults:25 });
+    const v = await yt("videos", { part:"snippet", id:j.items.map(i => i.contentDetails.videoId).join(",") });
+    return v.items.some(it => strict((it.snippet.title + " " + (it.snippet.description || "") + " " + (it.snippet.tags || []).join(" ")).toLowerCase()));
+  } catch { return false; }
+}
+async function discoverFanChannels() {
+  let hit = cget("sha_fandisc2", 10080);
+  if (hit && hit.miss.length && !cget("sha_fandisc2", 1440)) hit = null;
+  if (hit) return hit;
+  const ids = [], miss = [];
+  for (const n of CONFIG.fanChannelNames) {
+    const s = await yt("search", { part:"snippet", type:"channel", q:n, maxResults:10 });
+    const exact = s.items.filter(i => normName(i.snippet.channelTitle) === normName(n));
+    let ok = false;
+    for (const i of exact.slice(0, 3)) {
+      if (await looksFan(i.snippet.channelId)) { if (!ids.includes(i.snippet.channelId)) ids.push(i.snippet.channelId); ok = true; }
+    }
+    if (!ok) miss.push(n);
+  }
+  const d = { ids, miss }; cput("sha_fandisc2", d); return d;
+}
+const saveFan = () => cput("sha_fan7", { v:[...S.videos.values()].filter(v => v.src === "fan" && !v.extra), tok:S.fanTok, ch:S.fanCh });
 
 const saveOff = () => cput("sha_off2", { sig:JSON.stringify(jget("sha_chans", CONFIG.official)), videos:[...S.videos.values()].filter(v => v.src === "official" && !v.extra), state:S.official });
 
@@ -306,12 +330,15 @@ async function load() {
   }
   mergeFavs(); render();
   let fanNote = "";
-  const fan = cget("sha_fan5", CONFIG.fanCacheMin);
+  const fan = cget("sha_fan7", CONFIG.fanCacheMin);
   if (fan) { fan.v.forEach(v => S.videos.set(v.id, v)); S.fanTok = fan.tok || {}; S.fanCh = fan.ch || {}; }
   else {
     try {
       if (CONFIG.fanQueries.length) await loadFan();
       for (const c of jget("sha_fanch", CONFIG.fanChannels)) { try { await loadFanChannel((await resolve(c)).id, 1); } catch (e) { if (e.reason === "quotaExceeded") throw e; } }
+      const dsc = await discoverFanChannels();
+      for (const id of dsc.ids) { if (S.fanCh[id]) continue; try { await loadFanChannel(id, 1); } catch (e) { if (e.reason === "quotaExceeded") throw e; } }
+      if (dsc.miss.length) chanNote = (chanNote ? chanNote + " " : "") + "이름이 정확히 '" + dsc.miss.join("', '") + "'인 팬 채널을 못 찾았어요. 왼쪽 '팬 채널 추가'에 채널 주소를 넣어 주세요.";
       saveFan();
     } catch (e) { fanNote = "팬 쇼츠는 일부만 불러왔어요(" + (e.reason === "quotaExceeded" ? "오늘 할당량 소진" : e.message) + "). 공식 영상은 정상이에요."; }
   }
@@ -454,7 +481,7 @@ $("#fanin").value = jget("sha_fanch", CONFIG.fanChannels).map(c => c.id || c.han
 $("#fanset").onclick = () => {
   const v = $("#fanin").value.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
   if (v.length) localStorage.setItem("sha_fanch", JSON.stringify(v.map(parseChan))); else localStorage.removeItem("sha_fanch");
-  localStorage.removeItem("sha_fan5"); start();
+  localStorage.removeItem("sha_fan7"); start();
 };
 $("#chset").onclick = () => {
   const v = $("#chin").value.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
