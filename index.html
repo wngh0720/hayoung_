@@ -155,12 +155,14 @@ const CONFIG = {
   apiKey: "",                       // 발급받은 YouTube Data API 키를 넣거나, 비워 두고 사이트에서 직접 입력
   names: ["송하영", "song hayoung", "hayoung", "하영", "하냥", "송사리"],       // 공식 영상에서 '하영 포함'으로 표시할 단어
   official: [                       // 공식 채널 목록 (handle, id 중 하나. 못 찾으면 search 이름으로 검색)
-    { handle: "@fromis_9", search: "Official fromis_9" },
-    { search: "스튜디오 프로미스나인" },
-    { search: "방판소녀들" }
+    { handle: "@fromis9_official", search: "프로미스나인(fromis_9)" },   // 현재 공식 채널(어센드, 2025~)
+    { handle: "@Officialfromis9", search: "Official fromis_9" },        // 플레디스 시절 공식 채널(뮤직비디오, 티저, 과거 영상)
+    { handle: "@studiofromis_9", search: "스프 : 스튜디오 프로미스나인" }, // 웹예능
+    { handle: "@bangpan_sonyeodeul", search: "방판소녀들" }             // 방판소녀들(송하영 출연)
   ],
   fanQueries: ["송하영", "송하영 쇼츠", "송하영 직캠", "송하영 shorts", "Song Hayoung", "프로미스나인 하영", "하냥 프로미스나인", "송사리 프로미스나인 하영", "하냥 직캠"],  // 팬 쇼츠 검색어 (비우면 팬 쇼츠 끔)
   fanChannelNames: ["하냥", "송사리"],  // 이 이름이 들어간 팬 채널만 따로 항목을 만들고, 나머지는 '기타 팬 쇼츠'로 묶어요
+  fanChannels: [{ id: "UC48CkjltIEpJ_Ky1JoHWwTw" }],  // 기본 팬 채널(쇼츠만 가져와요): 하냥
   fanMaxSec: 180,                   // 팬 영상은 이 길이 이하(쇼츠)만 사용
   pages: 1,                         // 처음에 불러올 업로드 페이지 수 (1페이지 = 50개)
   cacheMin: 30, fanCacheMin: 360    // 캐시 시간(분). 길수록 API 할당량을 아껴요
@@ -282,7 +284,7 @@ async function loadFanChannel(cid, pages = 1) {
     await hydrate(j.items.map(i => i.contentDetails.videoId), "fan", "short", true);
   }
 }
-const saveFan = () => cput("sha_fan4", { v:[...S.videos.values()].filter(v => v.src === "fan" && !v.extra), tok:S.fanTok, ch:S.fanCh });
+const saveFan = () => cput("sha_fan5", { v:[...S.videos.values()].filter(v => v.src === "fan" && !v.extra), tok:S.fanTok, ch:S.fanCh });
 
 const saveOff = () => cput("sha_off2", { sig:JSON.stringify(jget("sha_chans", CONFIG.official)), videos:[...S.videos.values()].filter(v => v.src === "official" && !v.extra), state:S.official });
 
@@ -304,12 +306,12 @@ async function load() {
   }
   mergeFavs(); render();
   let fanNote = "";
-  const fan = cget("sha_fan4", CONFIG.fanCacheMin);
+  const fan = cget("sha_fan5", CONFIG.fanCacheMin);
   if (fan) { fan.v.forEach(v => S.videos.set(v.id, v)); S.fanTok = fan.tok || {}; S.fanCh = fan.ch || {}; }
   else {
     try {
       if (CONFIG.fanQueries.length) await loadFan();
-      for (const c of jget("sha_fanch", [])) { try { await loadFanChannel((await resolve(c)).id, 1); } catch (e) { if (e.reason === "quotaExceeded") throw e; } }
+      for (const c of jget("sha_fanch", CONFIG.fanChannels)) { try { await loadFanChannel((await resolve(c)).id, 1); } catch (e) { if (e.reason === "quotaExceeded") throw e; } }
       saveFan();
     } catch (e) { fanNote = "팬 쇼츠는 일부만 불러왔어요(" + (e.reason === "quotaExceeded" ? "오늘 할당량 소진" : e.message) + "). 공식 영상은 정상이에요."; }
   }
@@ -448,11 +450,11 @@ $("#host").onchange = e => { S.host = e.target.value; localStorage.setItem("sha_
 $("#clearseen").onclick = () => { S.seen = {}; S.hist = {}; jput("sha_seen", S.seen); jput("sha_hist", S.hist); render(); };
 const parseChan = s => { let m; if (m = /(UC[\w-]{20,})/.exec(s)) return { id:m[1] }; if (m = /@([\w.\-]+)/.exec(s)) return { handle:"@" + m[1] }; return { search:s }; };
 $("#chin").value = jget("sha_chans", []).map(c => c.id || c.handle || c.search).join(", ");
-$("#fanin").value = jget("sha_fanch", []).map(c => c.id || c.handle || c.search).join(", ");
+$("#fanin").value = jget("sha_fanch", CONFIG.fanChannels).map(c => c.id || c.handle || c.search).join(", ");
 $("#fanset").onclick = () => {
   const v = $("#fanin").value.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
   if (v.length) localStorage.setItem("sha_fanch", JSON.stringify(v.map(parseChan))); else localStorage.removeItem("sha_fanch");
-  localStorage.removeItem("sha_fan4"); start();
+  localStorage.removeItem("sha_fan5"); start();
 };
 $("#chset").onclick = () => {
   const v = $("#chin").value.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
