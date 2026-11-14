@@ -127,6 +127,12 @@ h1 .spark{font-size:.6em;vertical-align:.35em;opacity:.8}
 #meta{margin-top:4px}
 #themes [data-t=peach]{background:linear-gradient(135deg,#ff8fa3,#ffc27a)}
 .foot{max-width:1280px;margin:0 auto;padding:10px 24px 56px;color:var(--sub);font-size:13px;text-align:center;line-height:1.8}
+.toprow{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.subtabs{flex:1 1 320px;min-width:0}
+.tabs{overflow-x:auto}
+.tabs button{white-space:nowrap}
+#playall{margin-bottom:18px}
+.dbar span{color:#b9b6d6;font-size:13px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -158,7 +164,7 @@ h1 .spark{font-size:.6em;vertical-align:.35em;opacity:.8}
  </aside>
  <section>
   <div id="note"></div>
-  <div id="subtabs" class="subtabs"></div>
+  <div class="toprow"><div id="subtabs" class="subtabs"></div><button id="playall" class="btn" type="button" hidden>▶ 전체 재생</button></div>
   <div id="hero"></div>
   <div id="list"></div>
   <button id="more" class="btn" type="button" hidden>공식 영상 더 불러오기</button>
@@ -168,12 +174,23 @@ h1 .spark{font-size:.6em;vertical-align:.35em;opacity:.8}
 
 <dialog id="dlg">
  <div class="player" id="player"></div>
- <div class="dbar"><b id="dt"></b><button id="favd" type="button"></button><button id="prev" type="button">이전</button><button id="next" type="button">다음</button><a id="yt" target="_blank" rel="noopener">유튜브에서 보기</a><button id="close" type="button">닫기</button></div>
+ <div class="dbar"><b id="dt"></b><span id="cnt"></span><button id="favd" type="button"></button><button id="prev" type="button">이전</button><button id="next" type="button">다음</button><a id="yt" target="_blank" rel="noopener">유튜브에서 보기</a><button id="close" type="button">닫기</button></div>
 </dialog>
 
 <script>
 /* ===== 설정: 여기만 고치면 돼요 ===== */
 const CONFIG = {
+  members: [                        // 멤버별 커버 모아보기용. keys 에 이름과 별명을 적어요 (현재 멤버 5명, 이후 탈퇴 멤버)
+    { name: "송하영", keys: ["송하영", "하영", "hayoung", "ha young", "하냥"] },
+    { name: "박지원", keys: ["박지원", "지원", "jiwon", "ji won"] },
+    { name: "이나경", keys: ["이나경", "나경", "nakyung", "nagyung", "na kyung"] },
+    { name: "이채영", keys: ["이채영", "채영", "chaeyoung", "chae young"] },
+    { name: "백지헌", keys: ["백지헌", "지헌", "jiheon", "ji heon"] },
+    { name: "이새롬", keys: ["이새롬", "새롬", "saerom", "sae rom"] },
+    { name: "이서연", keys: ["이서연", "서연", "seoyeon", "seo yeon"] },
+    { name: "노지선", keys: ["노지선", "지선", "jisun", "ji sun"] },
+    { name: "장규리", keys: ["장규리", "규리", "gyuri"] }
+  ],
   apiKey: "",                       // 발급받은 YouTube Data API 키를 넣거나, 비워 두고 사이트에서 직접 입력
   names: ["송하영", "song hayoung", "hayoung", "하영", "하냥", "송사리"],       // 공식 영상에서 '하영 포함'으로 표시할 단어
   official: [                       // 공식 채널 목록 (handle, id 중 하나. 못 찾으면 search 이름으로 검색)
@@ -201,11 +218,11 @@ const HOSTS = {
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const HEAD = { fav:"내 목록", mv:"공식 영상", fan:"팬" };
-const CATS = [["all","전체"],["fav","즐겨찾기"],["seen","책갈피(본 영상)"],["mv","뮤직비디오·티저"],["stage","무대·퍼포먼스"],["series","예능·시리즈"],["behind","비하인드·브이로그"],["etc","기타 공식 영상"],["fan","팬 영상"]];
+const HEAD = { fav:"내 목록", song:"음악", mv:"공식 영상", fan:"팬" };
+const CATS = [["all","전체"],["fav","즐겨찾기"],["seen","책갈피(본 영상)"],["song","노래"],["cover","멤버 커버"],["mv","뮤직비디오·티저"],["stage","무대·퍼포먼스"],["series","예능·시리즈"],["behind","비하인드·브이로그"],["etc","기타 공식 영상"],["fan","팬 영상"]];
 const jget = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
 const jput = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-const S = { videos:new Map(), official:{}, cat:"all", fmt:"all", scope:"all", fan:false, sort:"new", q:"", chan:"", flat:[], cur:0,
+const S = { videos:new Map(), official:{}, cat:"all", fmt:"all", scope:"all", fan:false, sort:"new", q:"", chan:"", flat:[], queue:[], mem:"", cur:0,
   favs:jget("sha_fav", {}), seen:jget("sha_seen", {}), hist:jget("sha_hist", {}), fanTok:{}, fanCh:{}, seed:Math.random() * 1e9 | 0, host:localStorage.getItem("sha_host") || "yo" };
 
 const key = () => CONFIG.apiKey || localStorage.getItem("sha_key") || "";
@@ -227,6 +244,12 @@ const fmtDate = d => new Date(d).toLocaleDateString("ko-KR", { year:"numeric", m
 const isShort = v => v.short ?? v.sec <= 60;
 const fanNamed = v => CONFIG.fanChannelNames.some(n => v.ch.toLowerCase().includes(n.toLowerCase())) || !!S.fanCh[v.cid];
 const ckey = v => v.src === "fan" && !fanNamed(v) ? "__etc" : v.cid;
+
+const SONG_IN = /m\/v|\bmv\b|music video|뮤직비디오|뮤비|official audio|\baudio\b|lyric|가사|performance video|퍼포먼스|choreograph|안무|dance practice|댄스|live clip|라이브 ?클립|comeback live|컴백 ?라이브|special video|스페셜 ?비디오|\bost\b/i;
+const SONG_OUT = /teaser|티저|trailer|트레일러|highlight|medley|하이라이트|메들리|preview|프리뷰|spoiler|behind|비하인드|making|메이킹|reaction|리액션|interview|인터뷰|\bep\.?\s?\d|직캠|fancam|shorts?|cover|커버/i;
+const isSong = v => v.src === "official" && !isShort(v) && SONG_IN.test(v.t) && !SONG_OUT.test(v.t);
+const memberOf = v => { const s = v.t.toLowerCase(); return CONFIG.members.filter(m => m.keys.some(k => s.includes(k))).map(m => m.name); };
+const isCover = v => /cover|커버/i.test(v.t) && !/dance ?cover|댄스 ?커버|안무 ?커버|random ?play|랜덤 ?플레이/i.test(v.t) && memberOf(v).length > 0 && (v.src === "official" || /프로미스|fromis|프나/i.test(v.t) || CONFIG.members.some(m => v.t.includes(m.name)));
 
 function classify(t) {
   t = t.toLowerCase();
@@ -382,7 +405,7 @@ function card(v) {
 
 function render() {
   const all = [...S.videos.values()];
-  const inCat = (v, c) => c === "fav" ? !!S.favs[v.id] : c === "seen" ? !!S.seen[v.id] : v.extra ? false : c === "all" ? (v.src === "official" || S.fan) : v.cat === c;
+  const inCat = (v, c) => c === "fav" ? !!S.favs[v.id] : c === "seen" ? !!S.seen[v.id] : v.extra ? false : c === "all" ? (v.src === "official" || S.fan) : c === "song" ? isSong(v) : c === "cover" ? isCover(v) : v.cat === c;
   const pre0 = all.filter(v => (S.scope === "all" || v.named || S.cat === "fav" || S.cat === "seen") && (!S.q || (v.t + " " + v.ch).toLowerCase().includes(S.q)));
   const pre = pre0.filter(v => S.fmt === "all" || (S.fmt === "short") === (isShort(v)));
   const base = S.chan ? pre.filter(v => ckey(v) === S.chan) : pre;
@@ -394,11 +417,12 @@ function render() {
   const cb = c => `<button data-ch="${c.id}" class="${S.chan === c.id ? "on" : ""}">${esc(c.n)}<span>${c.k}</span></button>`;
   const offc = [...cnt.values()].filter(c => c.o).sort((x, y) => y.k - x.k), fanc = [...cnt.values()].filter(c => !c.o).sort((x, y) => (x.id === "__etc") - (y.id === "__etc") || y.k - x.k);
   const chName = (cnt.get(S.chan) || {}).n || "";
-  const inChan = pre0.filter(v => inCat(v, S.cat) && (!S.chan || ckey(v) === S.chan));
-  $("#subtabs").innerHTML = (S.chan ? `<h2 class="chtitle">${esc(chName)}</h2>` : "") + `<div class="tabs">` + [["all","전체",inChan.length],["long","영상",inChan.filter(v => !isShort(v)).length],["short","쇼츠",inChan.filter(v => isShort(v)).length]].map(([k, l, n]) => `<button data-fmt="${k}" class="${S.fmt === k ? "on" : ""}">${l}<span>${n}</span></button>`).join("") + `</div>` + (S.chan && !S.official[S.chan] && S.chan !== "__etc" && pendingFan(S.fanCh[S.chan]) ? `<button class="btn" data-fcmore="${S.chan}" type="button">이 채널 ${S.fanCh[S.chan]?.all ? "영상" : "쇼츠"} 더 불러오기</button>` : "");
+  const inChan = pre0.filter(v => inCat(v, S.cat) && (!S.chan || ckey(v) === S.chan) && (S.cat !== "cover" || !S.mem || memberOf(v).includes(S.mem)));
+  const memRow = S.cat === "cover" ? `<div class="tabs mem"><button data-mem="" class="${S.mem ? "" : "on"}">전체 멤버<span>${pre0.filter(v => inCat(v, "cover")).length}</span></button>` + CONFIG.members.map(m => `<button data-mem="${m.name}" class="${S.mem === m.name ? "on" : ""}">${m.name}<span>${pre0.filter(v => inCat(v, "cover") && memberOf(v).includes(m.name)).length}</span></button>`).join("") + `</div>` : "";
+  $("#subtabs").innerHTML = (S.chan ? `<h2 class="chtitle">${esc(chName)}</h2>` : "") + memRow + `<div class="tabs">` + [["all","전체",inChan.length],["long","영상",inChan.filter(v => !isShort(v)).length],["short","쇼츠",inChan.filter(v => isShort(v)).length]].map(([k, l, n]) => `<button data-fmt="${k}" class="${S.fmt === k ? "on" : ""}">${l}<span>${n}</span></button>`).join("") + `</div>` + (S.chan && !S.official[S.chan] && S.chan !== "__etc" && pendingFan(S.fanCh[S.chan]) ? `<button class="btn" data-fcmore="${S.chan}" type="button">이 채널 ${S.fanCh[S.chan]?.all ? "영상" : "쇼츠"} 더 불러오기</button>` : "");
   $("#chnav").innerHTML = (offc.length ? `<h3>공식 채널</h3><button data-ch="" class="${S.chan ? "" : "on"}">전체 채널</button>` + offc.map(cb).join("") : "") + (fanc.length ? `<h3>팬 채널</h3>` + fanc.map(cb).join("") : "");
 
-  const a = base.filter(v => inCat(v, S.cat));
+  const a = base.filter(v => inCat(v, S.cat) && (S.cat !== "cover" || !S.mem || memberOf(v).includes(S.mem)));
   const rnd = id => { let h = S.seed; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
   a.sort({ new:(x,y)=>y.pub.localeCompare(x.pub), old:(x,y)=>x.pub.localeCompare(y.pub), views:(x,y)=>y.views-x.views, random:(x,y)=>rnd(x.id)-rnd(y.id) }[S.sort]);
   const groups = [];
@@ -413,6 +437,7 @@ function render() {
   }
   const shown = groups.filter(g => g[1].length);
   S.flat = shown.flatMap(g => g[1]);
+  const pa = $("#playall"); pa.hidden = !S.flat.some(v => v.emb); if (!pa.disabled) pa.textContent = `▶ 전체 재생 (${S.flat.filter(v => v.emb).length})`;
   $("#list").innerHTML = shown.map(([h, l]) => `<h2 class="gh">${h}<small>${l.length}개</small></h2><div class="grid">${l.map(card).join("")}</div>`).join("")
     || `<p class="empty">${S.cat === "fav" ? "즐겨찾기한 영상이 없어요." : S.cat === "seen" ? "본 영상이 없어요." : "조건에 맞는 영상이 없어요. 필터를 바꿔 보세요."}</p>`;
 
@@ -428,21 +453,40 @@ function render() {
 }
 
 /* 재생 창 */
+let yp = null, ypReady = null;
+const loadYT = () => ypReady || (ypReady = new Promise(res => {
+  if (window.YT && YT.Player) return res();
+  window.onYouTubeIframeAPIReady = res;
+  const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; document.head.appendChild(s);
+}));
+function killYP() { try { yp && yp.destroy(); } catch {} yp = null; }
 function syncFav() {
-  const v = S.flat[S.cur], b = $("#favd"); if (!v) return;
+  const v = S.queue[S.cur], b = $("#favd"); if (!v) return;
   b.setAttribute("aria-pressed", !!S.favs[v.id]); b.textContent = S.favs[v.id] ? "♥ 즐겨찾기" : "♡ 즐겨찾기";
 }
-function play() {
-  const v = S.flat[S.cur]; if (!v) return;
+async function play() {
+  const v = S.queue[S.cur]; if (!v) return;
   const h = HOSTS[S.host] || HOSTS.yt;
   markSeen(v.id);
   $("#dt").textContent = v.t;
+  $("#cnt").textContent = `${S.cur + 1} / ${S.queue.length}`;
   const l = $("#yt"); l.href = h.watch + v.id; l.textContent = h.name + "에서 보기";
   syncFav();
   const p = $("#player"); p.className = "player" + (isShort(v) ? " v" : "");
-  p.innerHTML = v.emb
-    ? `<iframe src="${h.embed}${v.id}?autoplay=1&rel=0" title="${esc(v.t)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`
-    : `<p style="padding:40px;text-align:center">업로더가 퍼가기를 막은 영상이에요.<br>아래 '${h.name}에서 보기'로 봐 주세요.</p>`;
+  if (!v.emb) { killYP(); p.innerHTML = `<p style="padding:40px;text-align:center">업로더가 퍼가기를 막은 영상이에요.<br>아래 '${h.name}에서 보기'로 봐 주세요.</p>`; return; }
+  const ok = await Promise.race([loadYT().then(() => true), new Promise(r => setTimeout(() => r(false), 7000))]);
+  if (S.queue[S.cur] !== v) return;
+  if (!ok) {
+    killYP();
+    p.innerHTML = `<iframe src="${h.embed}${v.id}?autoplay=1&rel=0" title="${esc(v.t)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+    $("#cnt").textContent += " (자동 다음 재생 불가)"; return;
+  }
+  if (!yp) {
+    p.innerHTML = '<div id="ytp"></div>';
+    yp = new YT.Player("ytp", { host:"https://www.youtube-nocookie.com", width:"100%", height:"100%", videoId:v.id,
+      playerVars:{ autoplay:1, rel:0, playsinline:1, origin:location.origin },
+      events:{ onStateChange:e => { if (e.data === 0) step(1, true); }, onError:() => step(1, true) } });
+  } else yp.loadVideoById(v.id);
 }
 function openVideo(id) {
   const v = S.videos.get(id); if (!v) return;
@@ -452,25 +496,42 @@ function openVideo(id) {
     window.open(HOSTS.yo.watch + id, "_blank", "noopener");
     return;
   }
-  S.cur = S.flat.findIndex(x => x.id === id);
-  if (S.cur < 0) { S.flat = [v]; S.cur = 0; }
+  S.queue = S.flat.slice(); S.cur = S.queue.findIndex(x => x.id === id);
+  if (S.cur < 0) { S.queue = [v]; S.cur = 0; }
   play(); $("#dlg").showModal();
 }
-const step = d => { const n = S.cur + d; if (n >= 0 && n < S.flat.length) { S.cur = n; play(); } };
+function step(d, auto) {
+  let n = S.cur + d;
+  if (auto) while (n >= 0 && n < S.queue.length && !S.queue[n].emb) n += d;
+  if (n >= 0 && n < S.queue.length) { S.cur = n; play(); }
+}
+async function playAll() {
+  const b = $("#playall");
+  if (["song", "cover"].includes(S.cat)) {
+    b.disabled = true; b.textContent = "목록 불러오는 중…";
+    for (let i = 0; i < 300 && !$("#more").hidden && !autoOff; i++) { if (busy) await new Promise(r => setTimeout(r, 300)); else await loadMore(); }
+    b.disabled = false;
+  }
+  S.queue = S.flat.filter(v => v.emb);
+  if (!S.queue.length) return;
+  S.cur = 0; play(); $("#dlg").showModal();
+}
 
 document.addEventListener("click", e => {
   const fm = e.target.closest("[data-fcmore]"); if (fm) { fanChanMore(fm.dataset.fcmore); return; }
   const f = e.target.closest("[data-fav]"); if (f) { toggleFav(f.dataset.fav); render(); return; }
   const m = e.target.closest("[data-fmt]"); if (m) { S.fmt = m.dataset.fmt; render(); return; }
-  const c = e.target.closest("[data-c]"); if (c) { S.cat = c.dataset.c; S.chan = ""; render(); return; }
+  const mb = e.target.closest("[data-mem]"); if (mb) { S.mem = mb.dataset.mem; render(); return; }
+  const c = e.target.closest("[data-c]"); if (c) { S.cat = c.dataset.c; S.chan = ""; S.mem = ""; render(); return; }
   const h = e.target.closest("[data-ch]"); if (h) { S.chan = h.dataset.ch; render(); return; }
   const v = e.target.closest("[data-id]"); if (v) openVideo(v.dataset.id);
 });
-$("#favd").onclick = () => { const v = S.flat[S.cur]; if (v) { toggleFav(v.id); syncFav(); } };
+$("#favd").onclick = () => { const v = S.queue[S.cur]; if (v) { toggleFav(v.id); syncFav(); } };
+$("#playall").onclick = playAll;
 $("#prev").onclick = () => step(-1);
 $("#next").onclick = () => step(1);
 $("#close").onclick = () => $("#dlg").close();
-$("#dlg").addEventListener("close", () => { $("#player").innerHTML = ""; render(); });
+$("#dlg").addEventListener("close", () => { killYP(); $("#player").innerHTML = ""; render(); });
 $("#dlg").addEventListener("keydown", e => { if (e.key === "ArrowLeft") step(-1); if (e.key === "ArrowRight") step(1); });
 $("#scope").onchange = e => { S.scope = e.target.value; render(); };
 $("#sort").onchange = e => { S.sort = e.target.value; render(); };
@@ -504,7 +565,7 @@ async function loadMore() {
   catch (e) { autoOff = true; showErr(e); }
   busy = false; b.disabled = false; b.textContent = "공식 영상 더 불러오기";
 }
-const checkMore = () => { const b = $("#more"); if (!busy && !autoOff && !b.hidden && b.getBoundingClientRect().top < innerHeight + 400) loadMore(); };
+const checkMore = () => { const b = $("#more"); if (!busy && !autoOff && !b.hidden && (["song", "cover"].includes(S.cat) || b.getBoundingClientRect().top < innerHeight + 400)) loadMore(); };
 $("#more").onclick = () => { autoOff = false; loadMore(); };
 async function fanChanMore(cid) { if (busy) return; busy = true; try { await loadFanChannel(cid, 2, S.fanCh[cid]?.all); saveFan(); render(); } catch (e) { showErr(e); } busy = false; }
 $("#fanmore").onclick = async () => {
